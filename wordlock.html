@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a16" />
+<title>WORDLOCK — deduction safecracker</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .rows{display:flex;flex-direction:column;gap:8px;}
+  .grow{display:flex;align-items:center;gap:10px;}
+  .word{display:flex;gap:6px;flex:1;}
+  .tile{flex:1;max-width:48px;aspect-ratio:1/1;border-radius:9px;display:grid;place-items:center;
+    font-size:22px;font-weight:800;text-transform:uppercase;border:2px solid rgba(255,255,255,.1);
+    background:rgba(255,255,255,.04);}
+  .tile.filled{border-color:rgba(45,226,230,.5);background:rgba(45,226,230,.08);}
+  .tile.cur{border-color:var(--accent);}
+  .counts{display:flex;gap:8px;min-width:96px;justify-content:flex-end;}
+  .cbadge{display:flex;align-items:center;gap:3px;font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;
+    padding:4px 8px;border-radius:9px;}
+  .cbadge.lock{background:rgba(92,242,168,.16);color:var(--good);}
+  .cbadge.loose{background:rgba(255,210,63,.16);color:var(--gold);}
+  .cbadge small{font-size:13px;}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:2px;}
+  .seclabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.45;text-align:center;margin:8px 0 2px;}
+  details{font-size:12.5px;}
+  summary{cursor:pointer;color:var(--accent);opacity:.85;list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="home" href="index.html">← Games</a>
+      <div class="title">WORDLOCK</div>
+      <div class="tagline">Crack the word with logic — no colors given</div>
+    </div>
+
+    <div class="statbar">
+      <div class="s"><b id="tries">0</b><span>Guesses</span></div>
+      <div class="s"><b id="left">10</b><span>Remaining</span></div>
+      <div class="s"><b id="streak">0</b><span>Streak</span></div>
+      <div class="s"><b id="best">0</b><span>Best</span></div>
+    </div>
+
+    <div class="panel">
+      <details>
+        <summary>How to play ▾</summary>
+        <p class="help" style="margin-top:8px">
+          Guess any real 5-letter word. After each guess you get two numbers:<br>
+          <b style="color:var(--good)">🔒 in place</b> — letters that are correct AND in the right spot.<br>
+          <b style="color:var(--gold)">🔁 in word</b> — correct letters sitting in the wrong spot.<br>
+          You're <b>not</b> told which letters — deduce it. Tap the note chips below to track your thinking.
+          Crack it within <b>10</b> guesses.
+        </p>
+      </details>
+      <div class="seclabel">Guesses</div>
+      <div class="rows" id="rows"></div>
+    </div>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="seclabel">Your notes — tap to cycle: dim = not in word, gold = somewhere, green = found</div>
+    <div class="tracker" id="tracker"></div>
+
+    <div class="controls">
+      <button class="ghost" id="giveup">Give up</button>
+      <button class="ghost" id="newgame">New word</button>
+      <span class="ghost" id="mute" style="padding:11px 14px">🔊</span>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal">
+      <h2 id="result">Cracked!</h2>
+      <div class="reveal">The word was <b id="answer">—</b></div>
+      <div class="msg" id="summary"></div>
+      <div class="row">
+        <button class="btn" id="again">Play again</button>
+        <a class="ghost" href="index.html" style="display:grid;place-items:center">Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="shared.js"></script>
+  <script>
+  (() => {
+    const { $, randomAnswer, isValidGuess, analyze, Sound, toast, buildKeyboard, buildTracker, store, wireMute } = window.ARCADE;
+    const MAX = 10;
+    const streakStore = store('wordlock_streak');
+    const bestStore   = store('wordlock_best');
+
+    let secret, guesses, cur, over;
+    let streak = streakStore.get();
+    let best   = bestStore.get();
+
+    const rowsEl = $('#rows');
+    let tracker;
+
+    function newGame(){
+      secret = randomAnswer();
+      guesses = [];
+      cur = '';
+      over = false;
+      $('#overlay').classList.add('hidden');
+      tracker.reset();
+      render();
+      // console hint disabled in production
+    }
+
+    function tileRow(word, counts, isCurrent){
+      const row = document.createElement('div'); row.className='grow';
+      const w = document.createElement('div'); w.className='word';
+      for(let i=0;i<5;i++){
+        const t=document.createElement('div'); t.className='tile';
+        const ch = word[i] || '';
+        if(ch){ t.textContent=ch; t.classList.add(isCurrent?'cur':'filled'); }
+        else if(isCurrent && i===word.length){ t.classList.add('cur'); }
+        w.appendChild(t);
+      }
+      row.appendChild(w);
+      const c=document.createElement('div'); c.className='counts';
+      if(counts){
+        c.innerHTML = `<span class="cbadge lock">🔒 ${counts.exact}</span>`+
+                      `<span class="cbadge loose">🔁 ${counts.loose}</span>`;
+      }
+      row.appendChild(c);
+      return row;
+    }
+
+    function render(){
+      rowsEl.innerHTML='';
+      for(const g of guesses) rowsEl.appendChild(tileRow(g.word, g, false));
+      if(!over && guesses.length < MAX){
+        const r = tileRow(cur, null, true);
+        rowsEl.appendChild(r);
+      }
+      $('#tries').textContent = guesses.length;
+      $('#left').textContent  = Math.max(0, MAX - guesses.length);
+      $('#streak').textContent = streak;
+      $('#best').textContent = best;
+    }
+
+    function submit(){
+      if(over) return;
+      if(cur.length < 5){ toast('Need 5 letters'); shake(); return; }
+      if(!isValidGuess(cur)){ toast('Not a valid word'); Sound.bad(); shake(); return; }
+      if(guesses.some(g=>g.word===cur)){ toast('Already guessed'); shake(); return; }
+      const res = analyze(secret, cur);
+      guesses.push({ word: cur, exact: res.exact, loose: res.loose });
+      const won = res.exact === 5;
+      cur='';
+      if(won){ Sound.good(); win(); }
+      else if(guesses.length >= MAX){ Sound.bad(); lose(); }
+      else { Sound.good(); }
+      render();
+    }
+
+    function win(){
+      over=true; streak++; if(streak>best){ best=streak; bestStore.set(best); } streakStore.set(streak);
+      Sound.win();
+      finish(true, `Solved in ${guesses.length} guess${guesses.length>1?'es':''}.` +
+                   (guesses.length<=4?' Brilliant deduction! 🧠':''));
+    }
+    function lose(){
+      over=true; streak=0; streakStore.set(0);
+      Sound.lose();
+      finish(false, 'Out of guesses — the vault holds. Streak reset.');
+    }
+    function finish(didWin, msg){
+      $('#result').textContent = didWin ? 'CRACKED! 🔓' : 'LOCKED OUT';
+      $('#result').className = didWin ? 'win' : 'lose';
+      $('#answer').textContent = secret.toUpperCase();
+      $('#summary').textContent = msg;
+      setTimeout(()=>$('#overlay').classList.remove('hidden'), 500);
+    }
+
+    function shake(){ rowsEl.classList.remove('shake'); void rowsEl.offsetWidth; rowsEl.classList.add('shake'); }
+
+    // input
+    function addLetter(ch){ if(over) return; if(cur.length<5){ cur+=ch; render(); } }
+    function backspace(){ if(over) return; cur=cur.slice(0,-1); render(); }
+
+    buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:submit, onBack:backspace });
+    tracker = buildTracker($('#tracker'), { clickable:true });
+
+    window.addEventListener('keydown', e=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(e.key==='Enter'){ submit(); }
+      else if(e.key==='Backspace'){ backspace(); }
+      else if(/^[a-zA-Z]$/.test(e.key)){ Sound.init(); addLetter(e.key.toLowerCase()); }
+    });
+
+    $('#newgame').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#again').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#giveup').addEventListener('click', ()=>{ if(over) return; Sound.init(); lose(); render(); });
+    wireMute();
+
+    newGame();
+  })();
+  </script>
+</body>
+</html>

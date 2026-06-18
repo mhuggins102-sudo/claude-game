@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0a0a16" />
-<title>GLIDE — neon arcade</title>
+<title>Arcade — GLIDE & WORDFALL</title>
 <style>
   :root{
     --bg:#0a0a16;
-    --grid:#15152a;
     --accent:#2de2e6;
     --accent2:#ff2e97;
     --gold:#ffd23f;
@@ -20,559 +19,106 @@
     background:radial-gradient(circle at 50% -10%, #1a1a3a 0%, var(--bg) 55%);
     color:var(--text);
     font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
     min-height:100%;
-    overflow:hidden;
-    user-select:none;
-    touch-action:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:28px 18px;gap:34px;overflow-x:hidden;
   }
-  #wrap{
-    position:relative;
-    width:min(94vw,94vh,640px);
-    aspect-ratio:1/1;
-    display:flex;flex-direction:column;
-  }
-  header{
-    display:flex;align-items:flex-end;justify-content:space-between;
-    padding:0 4px 10px;
-  }
-  .title{
-    font-weight:800;letter-spacing:.32em;font-size:clamp(20px,5vw,30px);
+  .hero{text-align:center;display:flex;flex-direction:column;gap:10px;animation:rise .6s ease both;}
+  .kicker{font-size:12px;letter-spacing:.42em;opacity:.55;text-transform:uppercase;}
+  .brand{
+    font-weight:800;letter-spacing:.16em;font-size:clamp(40px,11vw,84px);line-height:1;
     background:linear-gradient(90deg,var(--accent),var(--accent2));
     -webkit-background-clip:text;background-clip:text;color:transparent;
-    text-shadow:0 0 24px rgba(45,226,230,.25);
+    text-shadow:0 0 50px rgba(45,226,230,.25);
   }
-  .scores{display:flex;gap:18px;text-align:right;}
-  .scorebox .label{font-size:10px;letter-spacing:.18em;opacity:.55;text-transform:uppercase;}
-  .scorebox .val{font-size:clamp(18px,4.5vw,26px);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05;}
-  #best .val{color:var(--gold);}
-  .stage{
-    position:relative;flex:1;border-radius:18px;overflow:hidden;
-    box-shadow:0 0 0 1px rgba(45,226,230,.16), 0 24px 70px rgba(0,0,0,.55), inset 0 0 80px rgba(45,226,230,.04);
-    background:rgba(8,8,20,.5);
+  .sub{opacity:.7;font-size:clamp(13px,3.4vw,16px);letter-spacing:.04em;}
+  .cards{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:22px;width:min(92vw,760px);
   }
-  canvas{display:block;width:100%;height:100%;}
-  /* combo meter */
-  #comboWrap{
-    position:absolute;left:14px;top:14px;display:flex;align-items:center;gap:8px;
-    opacity:0;transition:opacity .2s;pointer-events:none;z-index:3;
+  .card{
+    position:relative;display:flex;flex-direction:column;gap:14px;
+    text-decoration:none;color:var(--text);
+    padding:26px 24px 24px;border-radius:22px;overflow:hidden;
+    background:rgba(12,12,26,.6);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    transition:transform .18s ease, box-shadow .25s ease, border-color .25s;
+    animation:rise .6s ease both;
   }
-  #comboWrap.on{opacity:1;}
-  #comboMult{font-weight:800;font-size:22px;color:var(--gold);text-shadow:0 0 14px rgba(255,210,63,.6);}
-  #comboBar{width:90px;height:6px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;}
-  #comboBar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--gold),var(--accent2));transition:width .08s linear;}
-  /* overlays */
-  .overlay{
-    position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;text-align:center;gap:16px;padding:24px;
-    background:rgba(8,8,20,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  .card:nth-child(2){animation-delay:.08s;}
+  .card::before{
+    content:"";position:absolute;inset:0;opacity:.16;z-index:0;
+    background:radial-gradient(120% 90% at 20% 0%, var(--c1), transparent 60%);
     transition:opacity .25s;
   }
-  .overlay.hidden{opacity:0;pointer-events:none;}
-  .overlay h1{font-size:clamp(34px,9vw,60px);letter-spacing:.18em;font-weight:800;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;}
-  .overlay h2{font-size:clamp(26px,7vw,42px);letter-spacing:.1em;font-weight:800;color:var(--accent2);}
-  .overlay p{max-width:30ch;line-height:1.6;opacity:.85;font-size:clamp(13px,3.4vw,15px);}
-  .keys{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;font-size:12px;opacity:.8;}
-  .key{border:1px solid rgba(234,252,255,.28);border-radius:8px;padding:5px 9px;letter-spacing:.06em;background:rgba(255,255,255,.04);}
-  .btn{
-    cursor:pointer;border:none;border-radius:999px;padding:15px 38px;
-    font-size:16px;font-weight:800;letter-spacing:.14em;color:#04121a;
-    background:linear-gradient(90deg,var(--accent),#5cf2c0);
-    box-shadow:0 8px 30px rgba(45,226,230,.45);transition:transform .1s, box-shadow .2s;
+  .card:hover{transform:translateY(-6px);border-color:var(--c1);box-shadow:0 28px 70px rgba(0,0,0,.6), 0 0 40px var(--glow);}
+  .card:hover::before{opacity:.32;}
+  .card>*{position:relative;z-index:1;}
+  .icon{font-size:46px;filter:drop-shadow(0 0 16px var(--glow));}
+  .name{font-size:30px;font-weight:800;letter-spacing:.14em;color:var(--c1);}
+  .desc{font-size:14px;line-height:1.55;opacity:.82;min-height:44px;}
+  .tags{display:flex;gap:7px;flex-wrap:wrap;}
+  .tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);opacity:.85;}
+  .play{
+    margin-top:6px;align-self:flex-start;
+    font-weight:800;letter-spacing:.14em;font-size:14px;color:#04121a;
+    background:var(--c1);padding:11px 26px;border-radius:999px;
+    box-shadow:0 8px 26px var(--glow);
   }
-  .btn:hover{transform:translateY(-2px);box-shadow:0 12px 38px rgba(45,226,230,.6);}
-  .btn:active{transform:translateY(1px) scale(.98);}
-  .statline{display:flex;gap:26px;margin-top:2px;}
-  .statline div{display:flex;flex-direction:column;gap:2px;}
-  .statline .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;}
-  .statline .l{font-size:10px;letter-spacing:.16em;opacity:.55;text-transform:uppercase;}
-  .newbest{color:var(--gold);font-weight:800;letter-spacing:.14em;animation:pulse 1s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
-  footer{padding:10px 4px 0;text-align:center;font-size:11px;letter-spacing:.08em;opacity:.4;}
-  .muteBtn{
-    position:absolute;right:14px;top:12px;z-index:4;cursor:pointer;
-    width:34px;height:34px;border-radius:10px;border:1px solid rgba(234,252,255,.18);
-    background:rgba(255,255,255,.05);color:var(--text);font-size:15px;display:grid;place-items:center;
-  }
+  .glide{--c1:var(--accent);--glow:rgba(45,226,230,.4);}
+  .wordlock{--c1:#5cf2a8;--glow:rgba(92,242,168,.4);}
+  .sleuth{--c1:var(--accent2);--glow:rgba(255,46,151,.4);}
+  .probe{--c1:var(--gold);--glow:rgba(255,210,63,.4);}
+  .section-label{grid-column:1 / -1;text-align:left;font-size:11px;letter-spacing:.24em;text-transform:uppercase;opacity:.45;margin:6px 4px -6px;}
+  footer{opacity:.4;font-size:11px;letter-spacing:.1em;text-align:center;}
+  @keyframes rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
 <body>
-  <div id="wrap">
-    <header>
-      <div class="title">GLIDE</div>
-      <div class="scores">
-        <div class="scorebox" id="score"><div class="label">Score</div><div class="val">0</div></div>
-        <div class="scorebox" id="best"><div class="label">Best</div><div class="val">0</div></div>
-      </div>
-    </header>
-
-    <div class="stage">
-      <canvas id="game"></canvas>
-
-      <div id="comboWrap">
-        <span id="comboMult">x2</span>
-        <div id="comboBar"><i></i></div>
-      </div>
-      <div class="muteBtn" id="mute" title="Mute (M)">🔊</div>
-
-      <!-- Start -->
-      <div class="overlay" id="startScreen">
-        <h1>GLIDE</h1>
-        <p>Steer the line. Swallow the orbs. Don't bite yourself or hit the walls.
-           Eat fast to build a <b style="color:var(--gold)">combo</b> — the multiplier is where the points are.</p>
-        <div class="keys">
-          <span class="key">↑ ↓ ← →</span><span class="key">W A S D</span><span class="key">Swipe</span>
-          <span class="key">Space = pause</span>
-        </div>
-        <button class="btn" id="startBtn">PLAY</button>
-      </div>
-
-      <!-- Pause -->
-      <div class="overlay hidden" id="pauseScreen">
-        <h2>PAUSED</h2>
-        <button class="btn" id="resumeBtn">RESUME</button>
-      </div>
-
-      <!-- Game over -->
-      <div class="overlay hidden" id="overScreen">
-        <h2>GAME OVER</h2>
-        <div id="newBest" class="newbest" style="display:none">★ NEW BEST ★</div>
-        <div class="statline">
-          <div><span class="n" id="finalScore">0</span><span class="l">Score</span></div>
-          <div><span class="n" id="finalLen">0</span><span class="l">Length</span></div>
-          <div><span class="n" id="finalCombo">0</span><span class="l">Best Combo</span></div>
-        </div>
-        <button class="btn" id="againBtn">PLAY AGAIN</button>
-      </div>
-    </div>
-
-    <footer>Arrow keys / WASD / swipe &nbsp;•&nbsp; Space to pause &nbsp;•&nbsp; M to mute</footer>
+  <div class="hero">
+    <div class="kicker">a tiny neon arcade</div>
+    <div class="brand">ARCADE</div>
+    <div class="sub">Four games. Zero install. Pick your poison.</div>
   </div>
 
-<script>
-(() => {
-  "use strict";
+  <div class="cards">
+    <div class="section-label">⚡ Reflex</div>
+    <a class="card glide" href="glide.html">
+      <div class="icon">🐍</div>
+      <div class="name">GLIDE</div>
+      <div class="desc">Steer the neon line, swallow orbs, and chain combos for massive points. Don't bite yourself.</div>
+      <div class="tags"><span class="tag">Reflex</span><span class="tag">Combos</span><span class="tag">Arcade</span></div>
+      <span class="play">PLAY ▸</span>
+    </a>
 
-  // ---------- Setup ----------
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const GRID = 22;              // cells per side
-  let cell = 24;                // pixel size of a cell (set on resize)
-  let DPR = Math.min(window.devicePixelRatio || 1, 2);
+    <div class="section-label">🧠 Word deduction</div>
+    <a class="card wordlock" href="wordlock.html">
+      <div class="icon">🔐</div>
+      <div class="name">WORDLOCK</div>
+      <div class="desc">Crack a hidden word from two numbers alone — how many letters are in place vs. just in the word. No colors. Pure logic.</div>
+      <div class="tags"><span class="tag">Logic</span><span class="tag">Mastermind</span></div>
+      <span class="play">PLAY ▸</span>
+    </a>
 
-  const el = {
-    score: document.querySelector('#score .val'),
-    best: document.querySelector('#best .val'),
-    startScreen: document.getElementById('startScreen'),
-    pauseScreen: document.getElementById('pauseScreen'),
-    overScreen: document.getElementById('overScreen'),
-    finalScore: document.getElementById('finalScore'),
-    finalLen: document.getElementById('finalLen'),
-    finalCombo: document.getElementById('finalCombo'),
-    newBest: document.getElementById('newBest'),
-    comboWrap: document.getElementById('comboWrap'),
-    comboMult: document.getElementById('comboMult'),
-    comboBar: document.querySelector('#comboBar i'),
-    mute: document.getElementById('mute'),
-  };
+    <a class="card sleuth" href="sleuth.html">
+      <div class="icon">🕵️</div>
+      <div class="name">SLEUTH</div>
+      <div class="desc">Every guess reveals shared letters plus whether the secret is earlier or later in the dictionary. Squeeze the range shut.</div>
+      <div class="tags"><span class="tag">Deduction</span><span class="tag">Search</span></div>
+      <span class="play">PLAY ▸</span>
+    </a>
 
-  const BEST_KEY = 'glide_best_v1';
-  let best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0;
-  el.best.textContent = best;
+    <a class="card probe" href="probe.html">
+      <div class="icon">🔎</div>
+      <div class="name">PROBE</div>
+      <div class="desc">Spend a budget of clue tokens to interrogate the hidden word — test letters, reveal slots — then name it. Spend less, score more.</div>
+      <div class="tags"><span class="tag">Strategy</span><span class="tag">Detective</span></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+  </div>
 
-  function resize(){
-    const stage = canvas.parentElement;
-    const size = stage.clientWidth;
-    cell = size / GRID;
-    DPR = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(size * DPR);
-    canvas.height = Math.round(size * DPR);
-    canvas.style.width = size + 'px';
-    canvas.style.height = size + 'px';
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  }
-  window.addEventListener('resize', resize);
-
-  // ---------- Sound (WebAudio, no assets) ----------
-  const Sound = (() => {
-    let ac = null, muted = localStorage.getItem('glide_mute') === '1';
-    function ctxInit(){ if(!ac){ try{ ac = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
-    function beep(freq, dur=0.08, type='square', vol=0.06, slideTo=null){
-      if(muted || !ac) return;
-      const t = ac.currentTime;
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.setValueAtTime(freq, t);
-      if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
-      g.gain.setValueAtTime(vol, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-      o.connect(g).connect(ac.destination);
-      o.start(t); o.stop(t+dur);
-    }
-    return {
-      init: ctxInit,
-      eat(combo){ beep(420 + Math.min(combo,12)*55, 0.09, 'square', 0.07); },
-      gold(){ beep(660,0.10,'triangle',0.09,990); setTimeout(()=>beep(990,0.12,'triangle',0.08,1320),60); },
-      die(){ beep(220,0.5,'sawtooth',0.10,60); },
-      turn(){ beep(300,0.03,'sine',0.025); },
-      toggle(){ muted=!muted; localStorage.setItem('glide_mute', muted?'1':'0'); el.mute.textContent = muted?'🔇':'🔊'; return muted; },
-      get muted(){ return muted; }
-    };
-  })();
-  el.mute.textContent = Sound.muted ? '🔇' : '🔊';
-  el.mute.addEventListener('click', () => Sound.toggle());
-
-  // ---------- Game state ----------
-  const State = { MENU:0, PLAY:1, PAUSE:2, OVER:3 };
-  let state = State.MENU;
-
-  let snake, old, dir, nextDir, food, golds, particles, shake;
-  let score, comboCount, comboBest, comboTimer, comboMult, length;
-  let stepTime, acc, alive;
-
-  const COMBO_WINDOW = 2.2;       // seconds to keep combo alive
-  const BASE_STEP = 0.135;        // seconds per move at start
-  const MIN_STEP = 0.058;         // fastest
-
-  function reset(){
-    const mid = Math.floor(GRID/2);
-    snake = [ {x:mid, y:mid}, {x:mid-1, y:mid}, {x:mid-2, y:mid} ];
-    old = snake.map(s => ({...s}));
-    dir = {x:1, y:0};
-    nextDir = {x:1, y:0};
-    golds = [];
-    particles = [];
-    shake = 0;
-    score = 0; comboCount = 0; comboBest = 0; comboTimer = 0; comboMult = 1;
-    length = snake.length;
-    stepTime = BASE_STEP; acc = 0; alive = true;
-    spawnFood();
-    el.score.textContent = '0';
-    updateCombo(0);
-  }
-
-  function cellFree(x,y){
-    if(food && food.x===x && food.y===y) return false;
-    for(const g of golds) if(g.x===x && g.y===y) return false;
-    for(const s of snake) if(s.x===x && s.y===y) return false;
-    return true;
-  }
-  function randEmpty(){
-    let x,y,tries=0;
-    do{ x=(Math.random()*GRID)|0; y=(Math.random()*GRID)|0; tries++; }
-    while(!cellFree(x,y) && tries<500);
-    return {x,y};
-  }
-  function spawnFood(){ food = randEmpty(); food.pop = 0; }
-  function maybeSpawnGold(){
-    if(golds.length>0) return;
-    if(Math.random() < 0.22){
-      const g = randEmpty();
-      g.life = 6.0; g.max = 6.0;
-      golds.push(g);
-    }
-  }
-
-  // ---------- Input ----------
-  function setDir(nx,ny){
-    if(state!==State.PLAY) return;
-    // prevent 180° reversal relative to current committed dir
-    if(nx===-dir.x && ny===-dir.y) return;
-    if(nx===nextDir.x && ny===nextDir.y) return;
-    nextDir = {x:nx, y:ny};
-    Sound.turn();
-  }
-  const keymap = {
-    ArrowUp:[0,-1], KeyW:[0,-1],
-    ArrowDown:[0,1], KeyS:[0,1],
-    ArrowLeft:[-1,0], KeyA:[-1,0],
-    ArrowRight:[1,0], KeyD:[1,0],
-  };
-  window.addEventListener('keydown', e => {
-    if(keymap[e.code]){ e.preventDefault(); setDir(keymap[e.code][0], keymap[e.code][1]); return; }
-    if(e.code==='Space'){ e.preventDefault(); togglePause(); }
-    else if(e.code==='KeyM'){ Sound.toggle(); }
-    else if(e.code==='Enter'){
-      if(state===State.MENU) startGame();
-      else if(state===State.OVER) startGame();
-    }
-  });
-
-  // touch swipe
-  let touchStart = null;
-  const stage = canvas.parentElement;
-  stage.addEventListener('touchstart', e => {
-    touchStart = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:performance.now()};
-  }, {passive:true});
-  stage.addEventListener('touchmove', e => {
-    if(!touchStart) return;
-    const dx = e.touches[0].clientX - touchStart.x;
-    const dy = e.touches[0].clientY - touchStart.y;
-    if(Math.hypot(dx,dy) > 24){
-      if(Math.abs(dx) > Math.abs(dy)) setDir(dx>0?1:-1, 0);
-      else setDir(0, dy>0?1:-1);
-      touchStart = {x:e.touches[0].clientX, y:e.touches[0].clientY, t:performance.now()};
-    }
-  }, {passive:true});
-  stage.addEventListener('touchend', () => { touchStart=null; }, {passive:true});
-
-  // ---------- Flow ----------
-  function startGame(){
-    Sound.init();
-    reset();
-    state = State.PLAY;
-    el.startScreen.classList.add('hidden');
-    el.overScreen.classList.add('hidden');
-    el.pauseScreen.classList.add('hidden');
-  }
-  function togglePause(){
-    if(state===State.PLAY){ state=State.PAUSE; el.pauseScreen.classList.remove('hidden'); }
-    else if(state===State.PAUSE){ state=State.PLAY; el.pauseScreen.classList.add('hidden'); }
-  }
-  function gameOver(){
-    alive=false; state=State.OVER;
-    Sound.die();
-    shake = 16;
-    const isBest = score>best;
-    if(isBest){ best=score; localStorage.setItem(BEST_KEY, String(best)); el.best.textContent=best; }
-    el.finalScore.textContent = score;
-    el.finalLen.textContent = length;
-    el.finalCombo.textContent = comboBest;
-    el.newBest.style.display = isBest && score>0 ? 'block' : 'none';
-    // burst on death
-    const head = snake[0];
-    burst(head.x, head.y, '#ff2e97', 34);
-    setTimeout(()=> el.overScreen.classList.remove('hidden'), 420);
-  }
-
-  document.getElementById('startBtn').addEventListener('click', startGame);
-  document.getElementById('againBtn').addEventListener('click', startGame);
-  document.getElementById('resumeBtn').addEventListener('click', togglePause);
-
-  // ---------- Particles ----------
-  function burst(cx, cy, color, n){
-    for(let i=0;i<n;i++){
-      const a = Math.random()*Math.PI*2;
-      const sp = 1.5 + Math.random()*4.5;
-      particles.push({
-        x:(cx+0.5)*cell, y:(cy+0.5)*cell,
-        vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
-        life:1, decay:0.02+Math.random()*0.03,
-        size:2+Math.random()*3, color
-      });
-    }
-  }
-
-  // ---------- Combo UI ----------
-  function updateCombo(timerFrac){
-    if(comboMult>1){
-      el.comboWrap.classList.add('on');
-      el.comboMult.textContent = 'x'+comboMult;
-      el.comboBar.style.width = Math.max(0,Math.min(1,timerFrac))*100 + '%';
-    } else {
-      el.comboWrap.classList.remove('on');
-    }
-  }
-
-  // ---------- Logic step ----------
-  function step(){
-    dir = nextDir;
-    old = snake.map(s => ({...s}));
-    const head = {x:snake[0].x + dir.x, y:snake[0].y + dir.y};
-
-    // wall collision
-    if(head.x<0 || head.y<0 || head.x>=GRID || head.y>=GRID){ gameOver(); return; }
-    // self collision (tail moves away unless we eat; check against all but last if not eating)
-    const eating = food && head.x===food.x && head.y===food.y;
-    const limit = eating ? snake.length : snake.length-1;
-    for(let i=0;i<limit;i++){ if(snake[i].x===head.x && snake[i].y===head.y){ gameOver(); return; } }
-
-    snake.unshift(head);
-
-    // gold check
-    for(let i=golds.length-1;i>=0;i--){
-      if(head.x===golds[i].x && head.y===golds[i].y){
-        const gain = 50 * comboMult;
-        score += gain;
-        comboBump();
-        burst(golds[i].x, golds[i].y, '#ffd23f', 26);
-        golds.splice(i,1);
-        Sound.gold();
-        shake = Math.max(shake, 9);
-      }
-    }
-
-    if(eating){
-      score += 10 * comboMult;
-      length = snake.length;
-      comboBump();
-      burst(food.x, food.y, '#2de2e6', 16);
-      Sound.eat(comboCount);
-      shake = Math.max(shake, 5);
-      spawnFood();
-      maybeSpawnGold();
-      // speed up gradually with length
-      stepTime = Math.max(MIN_STEP, BASE_STEP - (snake.length-3)*0.0026);
-    } else {
-      snake.pop();
-    }
-    el.score.textContent = score;
-  }
-
-  function comboBump(){
-    comboCount++;
-    comboTimer = COMBO_WINDOW;
-    comboMult = 1 + Math.floor(comboCount/3);   // x2 at 3, x3 at 6, ...
-    if(comboMult>9) comboMult=9;
-    comboBest = Math.max(comboBest, comboMult);
-  }
-
-  // ---------- Render ----------
-  function lerp(a,b,t){ return a+(b-a)*t; }
-
-  function draw(t){
-    const w = GRID*cell;
-    ctx.clearRect(0,0,w,w);
-
-    // screen shake
-    let sx=0, sy=0;
-    if(shake>0.1){ sx=(Math.random()-0.5)*shake; sy=(Math.random()-0.5)*shake; }
-    ctx.save();
-    ctx.translate(sx,sy);
-
-    // grid
-    ctx.strokeStyle = 'rgba(45,226,230,0.05)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for(let i=1;i<GRID;i++){
-      ctx.moveTo(i*cell,0); ctx.lineTo(i*cell,w);
-      ctx.moveTo(0,i*cell); ctx.lineTo(w,i*cell);
-    }
-    ctx.stroke();
-
-    // food (pulsing)
-    if(food){
-      const pulse = 0.5 + 0.5*Math.sin(performance.now()/180);
-      drawOrb(food.x, food.y, '#2de2e6', 0.30 + pulse*0.06, 0.9);
-    }
-    // golds
-    for(const g of golds){
-      const pulse = 0.5 + 0.5*Math.sin(performance.now()/90);
-      const lifeFrac = g.life/g.max;
-      drawOrb(g.x, g.y, '#ffd23f', 0.30 + pulse*0.08, 0.7+0.3*lifeFrac);
-      // shrinking ring shows time left
-      const cx=(g.x+0.5)*cell, cy=(g.y+0.5)*cell;
-      ctx.strokeStyle='rgba(255,210,63,0.8)'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(cx,cy, cell*0.46, -Math.PI/2, -Math.PI/2 + Math.PI*2*lifeFrac); ctx.stroke();
-    }
-
-    // snake (interpolated)
-    const n = snake.length;
-    for(let i=n-1;i>=0;i--){
-      const cur = snake[i];
-      const prev = old[Math.min(i, old.length-1)];
-      const px = lerp(prev.x, cur.x, t);
-      const py = lerp(prev.y, cur.y, t);
-      const frac = i/Math.max(1,n-1);             // 0 head -> 1 tail
-      const cx=(px+0.5)*cell, cy=(py+0.5)*cell;
-      const isHead = i===0;
-      const r = (isHead? 0.46 : 0.40 - frac*0.12) * cell;
-      // color gradient head->tail
-      const col = mixColor([45,226,230],[255,46,151], frac);
-      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
-      ctx.shadowColor = `rgba(${col[0]},${col[1]},${col[2]},0.9)`;
-      ctx.shadowBlur = isHead? 22 : 12;
-      roundRect(cx-r, cy-r, r*2, r*2, r*0.55); ctx.fill();
-      ctx.shadowBlur = 0;
-      if(isHead){
-        // eyes
-        ctx.fillStyle='#04121a';
-        const ex = dir.x, ey = dir.y;
-        const off = r*0.34, eo = r*0.34;
-        ctx.beginPath();
-        ctx.arc(cx + ex*off - ey*eo, cy + ey*off + ex*eo, r*0.16, 0, 7); ctx.fill();
-        ctx.beginPath();
-        ctx.arc(cx + ex*off + ey*eo, cy + ey*off - ex*eo, r*0.16, 0, 7); ctx.fill();
-      }
-    }
-
-    // particles
-    for(const p of particles){
-      ctx.globalAlpha = Math.max(0,p.life);
-      ctx.fillStyle = p.color;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-
-    ctx.restore();
-  }
-
-  function drawOrb(gx,gy,color,glow,scale){
-    const cx=(gx+0.5)*cell, cy=(gy+0.5)*cell, r=cell*0.32*scale;
-    ctx.save();
-    ctx.shadowColor=color; ctx.shadowBlur=cell*glow*1.6;
-    ctx.fillStyle=color;
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,7); ctx.fill();
-    ctx.restore();
-  }
-
-  function roundRect(x,y,w,h,r){
-    ctx.beginPath();
-    ctx.moveTo(x+r,y);
-    ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r);
-    ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r);
-    ctx.closePath();
-  }
-  function mixColor(a,b,t){ return [Math.round(lerp(a[0],b[0],t)),Math.round(lerp(a[1],b[1],t)),Math.round(lerp(a[2],b[2],t))]; }
-
-  // ---------- Main loop ----------
-  let last = performance.now();
-  function frame(now){
-    let dt = (now-last)/1000; last=now;
-    if(dt>0.1) dt=0.1; // clamp after tab switch
-
-    if(state===State.PLAY){
-      acc += dt;
-      while(acc >= stepTime && alive){
-        acc -= stepTime;
-        step();
-      }
-      // combo timer
-      if(comboMult>1){
-        comboTimer -= dt;
-        if(comboTimer<=0){ comboMult=1; comboCount=0; }
-      }
-      updateCombo(comboTimer/COMBO_WINDOW);
-      // golds lifetime
-      for(let i=golds.length-1;i>=0;i--){
-        golds[i].life -= dt;
-        if(golds[i].life<=0) golds.splice(i,1);
-      }
-    }
-
-    // particles + shake always animate
-    for(let i=particles.length-1;i>=0;i--){
-      const p=particles[i];
-      p.x+=p.vx; p.y+=p.vy; p.vx*=0.94; p.vy*=0.94; p.life-=p.decay;
-      if(p.life<=0) particles.splice(i,1);
-    }
-    if(shake>0.1) shake*=0.86; else shake=0;
-
-    const t = state===State.PLAY ? Math.min(1, acc/stepTime) : (state===State.OVER||state===State.PAUSE?1:0);
-    if(state!==State.MENU) draw(t); else draw(0);
-
-    requestAnimationFrame(frame);
-  }
-
-  // ---------- Boot ----------
-  resize();
-  reset();            // so the board renders behind the start screen
-  state = State.MENU;
-  requestAnimationFrame(frame);
-
-})();
-</script>
+  <footer>Built for fun • works on desktop &amp; mobile • no downloads</footer>
 </body>
 </html>

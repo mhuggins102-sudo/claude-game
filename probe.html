@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a16" />
+<title>PROBE — interrogate the hidden word</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .board{display:flex;gap:8px;justify-content:center;margin:4px 0;}
+  .slot{width:50px;height:56px;border-radius:10px;border:2px dashed rgba(255,255,255,.18);display:grid;place-items:center;
+    font-size:24px;font-weight:800;text-transform:uppercase;background:rgba(255,255,255,.03);position:relative;}
+  .slot.known{border-style:solid;border-color:var(--good);background:rgba(92,242,168,.12);color:var(--good);}
+  .slot .pin{position:absolute;top:-9px;font-size:9px;opacity:.5;}
+  .tokens{display:flex;gap:5px;justify-content:center;margin:2px 0;}
+  .tok{width:14px;height:14px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px rgba(255,210,63,.6);}
+  .tok.spent{background:rgba(255,255,255,.12);box-shadow:none;}
+  .probes{display:flex;flex-direction:column;gap:10px;}
+  .prow{display:flex;flex-direction:column;gap:5px;}
+  .plabel{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;}
+  .slotbtns{display:flex;gap:6px;}
+  .sbtn{flex:1;height:38px;border-radius:9px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);
+    color:var(--text);font-weight:700;cursor:pointer;font-size:13px;}
+  .sbtn:hover:not(:disabled){background:rgba(255,255,255,.12);}
+  .sbtn:disabled{opacity:.35;cursor:not-allowed;}
+  .log{display:flex;flex-direction:column;gap:5px;max-height:20vh;overflow:auto;font-size:13px;}
+  .logline{display:flex;justify-content:space-between;gap:8px;padding:5px 9px;border-radius:8px;background:rgba(255,255,255,.04);}
+  .logline .a{font-weight:700;}
+  .logline .r{font-weight:800;}
+  .r.yes{color:var(--good);} .r.no{color:var(--bad);}
+  .seclabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.45;text-align:center;margin:8px 0 2px;}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:2px;}
+  .solveline{display:flex;gap:6px;justify-content:center;}
+  .stile{width:40px;height:46px;border-radius:8px;border:2px solid rgba(255,255,255,.12);display:grid;place-items:center;
+    font-size:20px;font-weight:800;text-transform:uppercase;background:rgba(255,255,255,.04);}
+  .stile.on{border-color:var(--accent2);}
+  details{font-size:12.5px;} summary{cursor:pointer;color:var(--accent);opacity:.85;list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+  .hint{font-size:11px;opacity:.5;text-align:center;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="home" href="index.html">← Games</a>
+      <div class="title">PROBE</div>
+      <div class="tagline">Spend clues wisely, then name the word</div>
+    </div>
+
+    <div class="statbar">
+      <div class="s"><b id="tokleft">7</b><span>Tokens</span></div>
+      <div class="s"><b id="streak">0</b><span>Streak</span></div>
+      <div class="s"><b id="best">0</b><span>Best</span></div>
+    </div>
+
+    <div class="tokens" id="tokens"></div>
+
+    <div class="panel">
+      <details>
+        <summary>How to play ▾</summary>
+        <p class="help" style="margin-top:8px">
+          A 5-letter word is hidden. Spend your <b style="color:var(--gold)">7 tokens</b> on clues:<br>
+          • <b>Test a letter</b> (1) — tap a chip to learn if it's in the word.<br>
+          • <b>Reveal a slot</b> (2) — uncover the exact letter in a position.<br>
+          • <b>Count vowels</b> (1) — how many vowels it has.<br>
+          When ready, type your answer and <b>SOLVE</b>. A wrong solve costs a token —
+          run out and the case goes cold. Fewer tokens spent = higher score.
+        </p>
+      </details>
+
+      <div class="board" id="board"></div>
+
+      <div class="probes" style="margin-top:10px">
+        <div class="prow">
+          <div class="plabel">Reveal a slot — 2 tokens</div>
+          <div class="slotbtns" id="slotbtns"></div>
+        </div>
+        <div class="prow">
+          <div class="plabel">Other clues</div>
+          <div class="slotbtns">
+            <button class="sbtn" id="vowelBtn">Count vowels (1)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="seclabel">Test a letter — 1 token each (green = in word, dim = not)</div>
+      <div class="tracker" id="tracker"></div>
+
+      <div class="seclabel">Evidence</div>
+      <div class="log" id="log"><div class="hint">No clues gathered yet.</div></div>
+    </div>
+
+    <div class="seclabel">Your answer</div>
+    <div class="solveline" id="solveline"></div>
+    <div class="keyboard" id="keyboard"></div>
+    <div class="controls">
+      <button class="btn pink" id="solveBtn">SOLVE</button>
+      <button class="ghost" id="giveup">Give up</button>
+      <button class="ghost" id="newgame">New word</button>
+      <span class="ghost" id="mute" style="padding:11px 14px">🔊</span>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal">
+      <h2 id="result">Solved!</h2>
+      <div class="reveal">The word was <b id="answer">—</b></div>
+      <div class="msg" id="summary"></div>
+      <div class="row">
+        <button class="btn" id="again">Play again</button>
+        <a class="ghost" href="index.html" style="display:grid;place-items:center">Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="shared.js"></script>
+  <script>
+  (() => {
+    const { $, randomAnswer, Sound, toast, buildKeyboard, buildTracker, store, wireMute } = window.ARCADE;
+    const START = 7;
+    const VOWELS = new Set(['a','e','i','o','u']);
+    const streakStore = store('probe_streak');
+    const bestStore   = store('probe_best');
+
+    let secret, tokens, revealed, vowelUsed, over, cur;
+    let streak = streakStore.get();
+    let best   = bestStore.get();
+    let tracker;
+
+    function newGame(){
+      secret = randomAnswer();
+      tokens = START;
+      revealed = [null,null,null,null,null];
+      vowelUsed = false;
+      over = false;
+      cur = '';
+      $('#overlay').classList.add('hidden');
+      $('#log').innerHTML = '<div class="hint">No clues gathered yet.</div>';
+      tracker.reset();
+      renderBoard(); renderTokens(); renderSlotBtns(); renderSolve(); updateControls();
+    }
+
+    function renderTokens(){
+      const t=$('#tokens'); t.innerHTML='';
+      for(let i=0;i<START;i++){ const d=document.createElement('div'); d.className='tok'+(i>=tokens?' spent':''); t.appendChild(d); }
+      $('#tokleft').textContent=tokens;
+      $('#streak').textContent=streak; $('#best').textContent=best;
+    }
+    function renderBoard(){
+      const b=$('#board'); b.innerHTML='';
+      for(let i=0;i<5;i++){
+        const s=document.createElement('div'); s.className='slot'+(revealed[i]?' known':'');
+        if(revealed[i]) s.textContent=revealed[i];
+        const pin=document.createElement('div'); pin.className='pin'; pin.textContent=i+1; s.appendChild(pin);
+        b.appendChild(s);
+      }
+    }
+    function renderSlotBtns(){
+      const c=$('#slotbtns'); c.innerHTML='';
+      for(let i=0;i<5;i++){
+        const btn=document.createElement('button'); btn.className='sbtn';
+        btn.textContent = revealed[i] ? revealed[i].toUpperCase() : ('#'+(i+1));
+        btn.disabled = over || !!revealed[i] || tokens<2;
+        btn.addEventListener('click',()=>revealSlot(i));
+        c.appendChild(btn);
+      }
+    }
+    function renderSolve(){
+      const sl=$('#solveline'); sl.innerHTML='';
+      for(let i=0;i<5;i++){
+        const t=document.createElement('div'); t.className='stile';
+        if(cur[i]){ t.textContent=cur[i]; t.classList.add('on'); }
+        else if(i===cur.length && !over) t.classList.add('on');
+        sl.appendChild(t);
+      }
+    }
+    function updateControls(){
+      $('#vowelBtn').disabled = over || vowelUsed || tokens<1;
+      $('#vowelBtn').textContent = vowelUsed ? 'Vowels counted' : 'Count vowels (1)';
+      $('#solveBtn').disabled = over;
+      renderSlotBtns();
+    }
+    function logLine(action, result, cls){
+      const log=$('#log');
+      if(log.querySelector('.hint')) log.innerHTML='';
+      const l=document.createElement('div'); l.className='logline pop';
+      l.innerHTML=`<span class="a">${action}</span><span class="r ${cls||''}">${result}</span>`;
+      log.appendChild(l); log.scrollTop=log.scrollHeight;
+    }
+
+    function spend(n){ tokens-=n; renderTokens(); updateControls(); if(tokens<=0 && !over) toast('Out of tokens — make your guess!'); }
+
+    // ---- probes ----
+    function testLetter(ch){
+      if(over) return;
+      if(tracker.get(ch)) { toast('Already tested "'+ch.toUpperCase()+'"'); return; }
+      if(tokens<1){ toast('Not enough tokens'); return; }
+      Sound.init(); spend(1);
+      const inWord = secret.includes(ch);
+      tracker.set(ch, inWord?'yes':'no');
+      logLine('Is there a "'+ch.toUpperCase()+'"?', inWord?'YES':'NO', inWord?'yes':'no');
+      Sound[inWord?'good':'bad']();
+    }
+    function revealSlot(i){
+      if(over||revealed[i]||tokens<2) return;
+      Sound.init(); spend(2);
+      const ch=secret[i]; revealed[i]=ch; tracker.set(ch,'yes');
+      renderBoard();
+      logLine('Reveal slot '+(i+1), ch.toUpperCase(), 'yes');
+      Sound.good();
+    }
+    function countVowels(){
+      if(over||vowelUsed||tokens<1) return;
+      Sound.init(); spend(1); vowelUsed=true;
+      let n=0; for(const c of secret) if(VOWELS.has(c)) n++;
+      logLine('How many vowels?', String(n));
+      updateControls();
+    }
+
+    // ---- solve ----
+    function solve(){
+      if(over) return;
+      if(cur.length<5){ toast('Type all 5 letters'); shake(); return; }
+      if(cur===secret){ win(); return; }
+      // wrong
+      Sound.bad(); shake();
+      logLine('Guess "'+cur.toUpperCase()+'"', 'WRONG', 'no');
+      if(tokens>0){ spend(1); toast('Not it — cost 1 token'); cur=''; renderSolve(); }
+      else { lose(); }
+    }
+    function win(){
+      over=true; streak++; if(streak>best){best=streak;bestStore.set(best);} streakStore.set(streak);
+      Sound.win();
+      const score = tokens*100 + 200;
+      finish(true, `Solved with ${tokens} token${tokens!==1?'s':''} to spare — score ${score}.`+
+                   (tokens>=4?' Master detective! 🔎':''));
+    }
+    function lose(){
+      over=true; streak=0; streakStore.set(0); Sound.lose();
+      finish(false,'The trail went cold. Streak reset.');
+    }
+    function finish(didWin,msg){
+      $('#result').textContent = didWin?'SOLVED! 🔎':'COLD CASE';
+      $('#result').className = didWin?'win':'lose';
+      $('#answer').textContent = secret.toUpperCase();
+      $('#summary').textContent = msg;
+      updateControls();
+      setTimeout(()=>$('#overlay').classList.remove('hidden'),500);
+    }
+    function shake(){ const sl=$('#solveline'); sl.classList.remove('shake'); void sl.offsetWidth; sl.classList.add('shake'); }
+
+    // input
+    function addLetter(ch){ if(over) return; if(cur.length<5){ cur+=ch; renderSolve(); } }
+    function backspace(){ if(over) return; cur=cur.slice(0,-1); renderSolve(); }
+
+    // Tracker chips act as "test a letter" probes (not free state cycling).
+    tracker = buildTracker($('#tracker'), { clickable:false });
+    $('#tracker').addEventListener('click', e=>{
+      const chip = e.target.closest('.chip'); if(!chip) return;
+      testLetter(chip.textContent);
+    });
+
+    buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:solve, onBack:backspace });
+    $('#vowelBtn').addEventListener('click', countVowels);
+    $('#solveBtn').addEventListener('click', ()=>{ Sound.init(); solve(); });
+    $('#giveup').addEventListener('click', ()=>{ if(over) return; Sound.init(); lose(); });
+    $('#newgame').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#again').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    window.addEventListener('keydown', e=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(e.key==='Enter') solve();
+      else if(e.key==='Backspace') backspace();
+      else if(/^[a-zA-Z]$/.test(e.key)){ Sound.init(); addLetter(e.key.toLowerCase()); }
+    });
+    wireMute();
+
+    newGame();
+  })();
+  </script>
+</body>
+</html>

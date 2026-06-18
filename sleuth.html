@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a16" />
+<title>SLEUTH — narrow down the secret word</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  .bounds{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800;letter-spacing:.1em;}
+  .bounds .b{padding:8px 12px;border-radius:10px;background:rgba(45,226,230,.1);border:1px solid rgba(45,226,230,.25);
+    font-size:16px;min-width:84px;text-align:center;text-transform:uppercase;}
+  .bounds .lbl{font-size:11px;opacity:.5;letter-spacing:.14em;text-transform:uppercase;}
+  .bwrap{display:flex;flex-direction:column;gap:5px;align-items:center;}
+  .glist{display:flex;flex-direction:column;gap:7px;max-height:34vh;overflow:auto;}
+  .gitem{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.04);}
+  .gword{font-weight:800;font-size:18px;letter-spacing:.14em;text-transform:uppercase;flex:1;}
+  .shares{font-weight:800;font-size:13px;padding:4px 9px;border-radius:999px;white-space:nowrap;}
+  .dir{font-size:12px;font-weight:700;letter-spacing:.06em;padding:4px 9px;border-radius:999px;white-space:nowrap;
+    background:rgba(255,255,255,.07);}
+  .dir.up{color:var(--accent);} .dir.down{color:var(--accent2);}
+  .curline{display:flex;gap:6px;justify-content:center;margin:6px 0 2px;}
+  .ctile{width:40px;height:46px;border-radius:8px;border:2px solid rgba(255,255,255,.12);display:grid;place-items:center;
+    font-size:20px;font-weight:800;text-transform:uppercase;background:rgba(255,255,255,.04);}
+  .ctile.on{border-color:var(--accent);}
+  .seclabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.45;text-align:center;margin:6px 0 2px;}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:2px;}
+  details{font-size:12.5px;} summary{cursor:pointer;color:var(--accent);opacity:.85;list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="home" href="index.html">← Games</a>
+      <div class="title">SLEUTH</div>
+      <div class="tagline">Two clues per guess — corner the secret word</div>
+    </div>
+
+    <div class="statbar">
+      <div class="s"><b id="tries">0</b><span>Guesses</span></div>
+      <div class="s"><b id="streak">0</b><span>Streak</span></div>
+      <div class="s"><b id="best">0</b><span>Best</span></div>
+    </div>
+
+    <div class="panel">
+      <details>
+        <summary>How to play ▾</summary>
+        <p class="help" style="margin-top:8px">
+          Find the hidden 5-letter word. Each guess returns two clues:<br>
+          <b>shares N</b> — how many letters your guess has in common with the secret (any position).<br>
+          <b style="color:var(--accent)">earlier</b> / <b style="color:var(--accent2)">later</b> — whether the secret comes
+          before or after your guess in the dictionary.<br>
+          Use both to squeeze the answer. The live range below updates automatically.
+        </p>
+      </details>
+
+      <div class="bwrap" style="margin-top:8px">
+        <div class="lbl">The secret is somewhere between</div>
+        <div class="bounds">
+          <div class="b" id="lo">—</div>
+          <span style="opacity:.5">…</span>
+          <div class="b" id="hi">—</div>
+        </div>
+      </div>
+
+      <div class="curline" id="curline"></div>
+
+      <div class="seclabel">Your guesses</div>
+      <div class="glist" id="glist"><div class="help" style="text-align:center;opacity:.5">No guesses yet — start anywhere!</div></div>
+    </div>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="controls">
+      <button class="ghost" id="giveup">Give up</button>
+      <button class="ghost" id="newgame">New word</button>
+      <span class="ghost" id="mute" style="padding:11px 14px">🔊</span>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal">
+      <h2 id="result">Found it!</h2>
+      <div class="reveal">The word was <b id="answer">—</b></div>
+      <div class="msg" id="summary"></div>
+      <div class="row">
+        <button class="btn" id="again">Play again</button>
+        <a class="ghost" href="index.html" style="display:grid;place-items:center">Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="shared.js"></script>
+  <script>
+  (() => {
+    const { $, randomAnswer, isValidGuess, analyze, Sound, toast, buildKeyboard, store, wireMute } = window.ARCADE;
+    const streakStore = store('sleuth_streak');
+    const bestStore   = store('sleuth_best');
+
+    let secret, guesses, cur, over, lo, hi;
+    let streak = streakStore.get();
+    let best   = bestStore.get();
+
+    const glistEl = $('#glist');
+
+    function newGame(){
+      secret = randomAnswer();
+      guesses=[]; cur=''; over=false; lo=null; hi=null;
+      $('#overlay').classList.add('hidden');
+      render();
+    }
+
+    function warmthColor(n){
+      // 0 cold -> 5 hot
+      const stops=[[58,110,165],[60,150,170],[120,180,120],[210,180,70],[235,120,70],[255,70,90]];
+      const c=stops[Math.max(0,Math.min(5,n))];
+      return `rgba(${c[0]},${c[1]},${c[2]},.85)`;
+    }
+
+    function render(){
+      // bounds
+      $('#lo').textContent = lo ? lo : '—';
+      $('#hi').textContent = hi ? hi : '—';
+      // current entry tiles
+      const cl=$('#curline'); cl.innerHTML='';
+      for(let i=0;i<5;i++){
+        const t=document.createElement('div'); t.className='ctile';
+        if(cur[i]){ t.textContent=cur[i]; t.classList.add('on'); }
+        else if(i===cur.length && !over) t.classList.add('on');
+        cl.appendChild(t);
+      }
+      // guesses (newest first)
+      if(guesses.length===0){
+        glistEl.innerHTML='<div class="help" style="text-align:center;opacity:.5">No guesses yet — start anywhere!</div>';
+      } else {
+        glistEl.innerHTML='';
+        for(let i=guesses.length-1;i>=0;i--){
+          const g=guesses[i];
+          const it=document.createElement('div'); it.className='gitem';
+          const dirCls = g.dir==='earlier'?'up':'down';
+          const dirTxt = g.dir==='earlier'?'↑ earlier':'↓ later';
+          it.innerHTML = `<span class="gword">${g.word}</span>`+
+            `<span class="shares" style="background:${warmthColor(g.shares)};color:#06121a">shares ${g.shares}</span>`+
+            `<span class="dir ${dirCls}">${dirTxt}</span>`;
+          glistEl.appendChild(it);
+        }
+      }
+      $('#tries').textContent=guesses.length;
+      $('#streak').textContent=streak;
+      $('#best').textContent=best;
+    }
+
+    function submit(){
+      if(over) return;
+      if(cur.length<5){ toast('Need 5 letters'); shake(); return; }
+      if(!isValidGuess(cur)){ toast('Not a valid word'); Sound.bad(); shake(); return; }
+      if(guesses.some(g=>g.word===cur)){ toast('Already guessed'); shake(); return; }
+      if(cur===secret){
+        guesses.push({word:cur, shares:5, dir:'earlier'});
+        cur=''; Sound.good(); win(); render(); return;
+      }
+      const res = analyze(secret, cur);
+      const dir = secret < cur ? 'earlier' : 'later';
+      if(dir==='earlier'){ hi = (!hi || cur < hi) ? cur : hi; }
+      else { lo = (!lo || cur > lo) ? cur : lo; }
+      guesses.push({ word:cur, shares:res.common, dir });
+      cur=''; Sound.good();
+      render();
+    }
+
+    function win(){
+      over=true; streak++; if(streak>best){best=streak;bestStore.set(best);} streakStore.set(streak);
+      Sound.win();
+      const n=guesses.length;
+      finish(true, `Nailed it in ${n} guess${n>1?'es':''}.`+(n<=5?' Sharp work, detective! 🕵️':''));
+    }
+    function lose(){
+      over=true; streak=0; streakStore.set(0); Sound.lose();
+      finish(false,'Case closed unsolved. Streak reset.');
+    }
+    function finish(didWin,msg){
+      $('#result').textContent = didWin?'SOLVED! 🕵️':'GAVE UP';
+      $('#result').className = didWin?'win':'lose';
+      $('#answer').textContent = secret.toUpperCase();
+      $('#summary').textContent = msg;
+      setTimeout(()=>$('#overlay').classList.remove('hidden'),500);
+    }
+
+    function shake(){ const cl=$('#curline'); cl.classList.remove('shake'); void cl.offsetWidth; cl.classList.add('shake'); }
+
+    function addLetter(ch){ if(over) return; if(cur.length<5){ cur+=ch; render(); } }
+    function backspace(){ if(over) return; cur=cur.slice(0,-1); render(); }
+
+    buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:submit, onBack:backspace });
+    window.addEventListener('keydown', e=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(e.key==='Enter') submit();
+      else if(e.key==='Backspace') backspace();
+      else if(/^[a-zA-Z]$/.test(e.key)){ Sound.init(); addLetter(e.key.toLowerCase()); }
+    });
+    $('#newgame').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#again').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#giveup').addEventListener('click', ()=>{ if(over) return; Sound.init(); lose(); });
+    wireMute();
+
+    newGame();
+  })();
+  </script>
+</body>
+</html>
