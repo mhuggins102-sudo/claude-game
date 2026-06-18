@@ -72,6 +72,10 @@
   .sleuth{--c1:var(--accent2);--glow:rgba(255,46,151,.4);}
   .probe{--c1:var(--gold);--glow:rgba(255,210,63,.4);}
   .section-label{grid-column:1 / -1;text-align:left;font-size:11px;letter-spacing:.24em;text-transform:uppercase;opacity:.45;margin:6px 4px -6px;}
+  .stats{font-size:12px;letter-spacing:.04em;opacity:.85;min-height:16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .stats b{color:var(--c1);font-variant-numeric:tabular-nums;}
+  .stats .sep{opacity:.35;}
+  .stats .none{opacity:.4;font-style:italic;}
   footer{opacity:.4;font-size:11px;letter-spacing:.1em;text-align:center;}
   @keyframes rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
 </style>
@@ -90,6 +94,7 @@
       <div class="name">GLIDE</div>
       <div class="desc">Steer the neon line, swallow orbs, and chain combos for massive points. Don't bite yourself.</div>
       <div class="tags"><span class="tag">Reflex</span><span class="tag">Combos</span><span class="tag">Arcade</span></div>
+      <div class="stats" data-game="glide"></div>
       <span class="play">PLAY ▸</span>
     </a>
 
@@ -99,6 +104,7 @@
       <div class="name">WORDLOCK</div>
       <div class="desc">Crack a hidden word from two numbers alone — how many letters are in place vs. just in the word. No colors. Pure logic.</div>
       <div class="tags"><span class="tag">Logic</span><span class="tag">Mastermind</span></div>
+      <div class="stats" data-game="wordlock"></div>
       <span class="play">PLAY ▸</span>
     </a>
 
@@ -107,6 +113,7 @@
       <div class="name">SLEUTH</div>
       <div class="desc">Every guess reveals shared letters plus whether the secret is earlier or later in the dictionary. Squeeze the range shut.</div>
       <div class="tags"><span class="tag">Deduction</span><span class="tag">Search</span></div>
+      <div class="stats" data-game="sleuth"></div>
       <span class="play">PLAY ▸</span>
     </a>
 
@@ -115,10 +122,28 @@
       <div class="name">PROBE</div>
       <div class="desc">Spend a budget of clue tokens to interrogate the hidden word — test letters, reveal slots — then name it. Spend less, score more.</div>
       <div class="tags"><span class="tag">Strategy</span><span class="tag">Detective</span></div>
+      <div class="stats" data-game="probe"></div>
       <span class="play">PLAY ▸</span>
     </a>
   </div>
 
   <footer>Built for fun • works on desktop &amp; mobile • no downloads</footer>
+
+  <script>
+    // Surface each game's saved progress on its card.
+    const num = k => parseInt(localStorage.getItem(k) || '0', 10) || 0;
+    document.querySelectorAll('.stats').forEach(elm => {
+      const g = elm.dataset.game;
+      if (g === 'glide') {
+        const best = num('glide_best_v1');
+        elm.innerHTML = best ? `🏆 Best score <b>${best}</b>` : `<span class="none">no score yet</span>`;
+      } else {
+        const streak = num(g + '_streak'), best = num(g + '_best');
+        elm.innerHTML = (streak || best)
+          ? `🔥 Streak <b>${streak}</b> <span class="sep">•</span> 🏆 Best <b>${best}</b>`
+          : `<span class="none">not played yet</span>`;
+      }
+    });
+  </script>
 </body>
 </html>

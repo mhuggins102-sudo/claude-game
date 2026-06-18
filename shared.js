@@ -24,31 +24,6 @@
     return { exact, common, loose: common-exact };
   }
 
-  // ---- Sound (WebAudio, no assets) ----
-  const Sound = (()=>{
-    let ac=null, muted = localStorage.getItem('arcade_mute')==='1';
-    function init(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
-    function tone(f,d=0.08,type='sine',v=0.05,slide=null){
-      if(muted||!ac) return;
-      const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
-      o.type=type;o.frequency.setValueAtTime(f,t);
-      if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);
-      g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(0.0001,t+d);
-      o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d);
-    }
-    return {
-      init,
-      click(){ tone(330,0.03,'sine',0.03); },
-      key(){ tone(420,0.025,'sine',0.022); },
-      good(){ tone(520,0.09,'triangle',0.05,720); },
-      bad(){ tone(200,0.18,'sawtooth',0.05,120); },
-      win(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.16,'triangle',0.06),i*90)); },
-      lose(){ [330,247,196].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sawtooth',0.05),i*120)); },
-      toggle(){ muted=!muted; localStorage.setItem('arcade_mute',muted?'1':'0'); return muted; },
-      get muted(){ return muted; }
-    };
-  })();
-
   // ---- Toast ----
   let toastEl=null, toastTimer=null;
   function toast(msg, ms=1400){
@@ -57,7 +32,7 @@
     clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.classList.remove('show'), ms);
   }
 
-  // ---- On-screen keyboard ----
+  // ---- On-screen keyboard (Backspace left, Enter right) ----
   // opts: { onKey(letter), onEnter(), onBack() }  -> returns { mark(letter,state), resetMarks() }
   function buildKeyboard(container, opts){
     container.innerHTML='';
@@ -65,18 +40,18 @@
     const keyEls={};
     rows.forEach((row,ri)=>{
       const r=document.createElement('div'); r.className='krow';
-      if(ri===2 && opts.onEnter){ r.appendChild(special('enter','⏎',()=>opts.onEnter())); }
+      if(ri===2 && opts.onBack){ r.appendChild(special('back','⌫',()=>opts.onBack())); }
       for(const ch of row){
         const b=document.createElement('button'); b.className='key'; b.textContent=ch;
-        b.addEventListener('click',()=>{ Sound.key(); opts.onKey&&opts.onKey(ch); });
+        b.addEventListener('click',()=>{ opts.onKey&&opts.onKey(ch); });
         keyEls[ch]=b; r.appendChild(b);
       }
-      if(ri===2 && opts.onBack){ r.appendChild(special('back','⌫',()=>opts.onBack())); }
+      if(ri===2 && opts.onEnter){ r.appendChild(special('enter','⏎',()=>opts.onEnter())); }
       container.appendChild(r);
     });
     function special(cls,label,fn){
       const b=document.createElement('button'); b.className='key wide '+cls; b.textContent=label;
-      b.addEventListener('click',()=>{ Sound.click(); fn(); }); return b;
+      b.addEventListener('click',()=>{ fn(); }); return b;
     }
     return {
       mark(letter,state){ const k=keyEls[letter]; if(!k)return; k.classList.remove('no','maybe','yes'); if(state) k.classList.add(state); },
@@ -96,7 +71,7 @@
       if(opts.clickable){
         c.addEventListener('click',()=>{
           const ni=(cycle.indexOf(states[ch])+1)%cycle.length;
-          set(ch, cycle[ni]); Sound.click(); opts.onChange&&opts.onChange(ch,states[ch]);
+          set(ch, cycle[ni]); opts.onChange&&opts.onChange(ch,states[ch]);
         });
       }
       els[ch]=c; container.appendChild(c);
@@ -113,12 +88,5 @@
     };
   }
 
-  // ---- Mute button wiring (expects element with id="mute") ----
-  function wireMute(){
-    const m=$('#mute'); if(!m) return;
-    m.textContent = Sound.muted?'🔇':'🔊';
-    m.addEventListener('click',()=>{ Sound.init(); m.textContent=Sound.toggle()?'🔇':'🔊'; });
-  }
-
-  window.ARCADE = { ANSWERS, VALID, $, $$, randomAnswer, isValidGuess, analyze, Sound, toast, buildKeyboard, buildTracker, store, wireMute };
+  window.ARCADE = { ANSWERS, VALID, $, $$, randomAnswer, isValidGuess, analyze, toast, buildKeyboard, buildTracker, store };
 })();

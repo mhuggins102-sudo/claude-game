@@ -97,7 +97,6 @@
       <button class="btn pink" id="solveBtn">SOLVE</button>
       <button class="ghost" id="giveup">Give up</button>
       <button class="ghost" id="newgame">New word</button>
-      <span class="ghost" id="mute" style="padding:11px 14px">🔊</span>
     </div>
   </div>
 
@@ -117,7 +116,7 @@
   <script src="shared.js"></script>
   <script>
   (() => {
-    const { $, randomAnswer, Sound, toast, buildKeyboard, buildTracker, store, wireMute } = window.ARCADE;
+    const { $, randomAnswer, toast, buildKeyboard, buildTracker, store } = window.ARCADE;
     const START = 7;
     const VOWELS = new Set(['a','e','i','o','u']);
     const streakStore = store('probe_streak');
@@ -196,23 +195,23 @@
       if(over) return;
       if(tracker.get(ch)) { toast('Already tested "'+ch.toUpperCase()+'"'); return; }
       if(tokens<1){ toast('Not enough tokens'); return; }
-      Sound.init(); spend(1);
+       spend(1);
       const inWord = secret.includes(ch);
       tracker.set(ch, inWord?'yes':'no');
       logLine('Is there a "'+ch.toUpperCase()+'"?', inWord?'YES':'NO', inWord?'yes':'no');
-      Sound[inWord?'good':'bad']();
+      
     }
     function revealSlot(i){
       if(over||revealed[i]||tokens<2) return;
-      Sound.init(); spend(2);
+       spend(2);
       const ch=secret[i]; revealed[i]=ch; tracker.set(ch,'yes');
       renderBoard();
       logLine('Reveal slot '+(i+1), ch.toUpperCase(), 'yes');
-      Sound.good();
+      
     }
     function countVowels(){
       if(over||vowelUsed||tokens<1) return;
-      Sound.init(); spend(1); vowelUsed=true;
+       spend(1); vowelUsed=true;
       let n=0; for(const c of secret) if(VOWELS.has(c)) n++;
       logLine('How many vowels?', String(n));
       updateControls();
@@ -224,20 +223,20 @@
       if(cur.length<5){ toast('Type all 5 letters'); shake(); return; }
       if(cur===secret){ win(); return; }
       // wrong
-      Sound.bad(); shake();
+       shake();
       logLine('Guess "'+cur.toUpperCase()+'"', 'WRONG', 'no');
       if(tokens>0){ spend(1); toast('Not it — cost 1 token'); cur=''; renderSolve(); }
       else { lose(); }
     }
     function win(){
       over=true; streak++; if(streak>best){best=streak;bestStore.set(best);} streakStore.set(streak);
-      Sound.win();
+      
       const score = tokens*100 + 200;
       finish(true, `Solved with ${tokens} token${tokens!==1?'s':''} to spare — score ${score}.`+
                    (tokens>=4?' Master detective! 🔎':''));
     }
     function lose(){
-      over=true; streak=0; streakStore.set(0); Sound.lose();
+      over=true; streak=0; streakStore.set(0); 
       finish(false,'The trail went cold. Streak reset.');
     }
     function finish(didWin,msg){
@@ -263,17 +262,16 @@
 
     buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:solve, onBack:backspace });
     $('#vowelBtn').addEventListener('click', countVowels);
-    $('#solveBtn').addEventListener('click', ()=>{ Sound.init(); solve(); });
-    $('#giveup').addEventListener('click', ()=>{ if(over) return; Sound.init(); lose(); });
-    $('#newgame').addEventListener('click', ()=>{ Sound.init(); newGame(); });
-    $('#again').addEventListener('click', ()=>{ Sound.init(); newGame(); });
+    $('#solveBtn').addEventListener('click', ()=>{  solve(); });
+    $('#giveup').addEventListener('click', ()=>{ if(over) return;  lose(); });
+    $('#newgame').addEventListener('click', ()=>{  newGame(); });
+    $('#again').addEventListener('click', ()=>{  newGame(); });
     window.addEventListener('keydown', e=>{
       if(e.metaKey||e.ctrlKey||e.altKey) return;
       if(e.key==='Enter') solve();
       else if(e.key==='Backspace') backspace();
-      else if(/^[a-zA-Z]$/.test(e.key)){ Sound.init(); addLetter(e.key.toLowerCase()); }
+      else if(/^[a-zA-Z]$/.test(e.key)){  addLetter(e.key.toLowerCase()); }
     });
-    wireMute();
 
     newGame();
   })();

@@ -75,7 +75,6 @@
     <div class="controls">
       <button class="ghost" id="giveup">Give up</button>
       <button class="ghost" id="newgame">New word</button>
-      <span class="ghost" id="mute" style="padding:11px 14px">🔊</span>
     </div>
   </div>
 
@@ -95,7 +94,7 @@
   <script src="shared.js"></script>
   <script>
   (() => {
-    const { $, randomAnswer, isValidGuess, analyze, Sound, toast, buildKeyboard, store, wireMute } = window.ARCADE;
+    const { $, randomAnswer, isValidGuess, analyze, toast, buildKeyboard, store } = window.ARCADE;
     const streakStore = store('sleuth_streak');
     const bestStore   = store('sleuth_best');
 
@@ -155,29 +154,29 @@
     function submit(){
       if(over) return;
       if(cur.length<5){ toast('Need 5 letters'); shake(); return; }
-      if(!isValidGuess(cur)){ toast('Not a valid word'); Sound.bad(); shake(); return; }
+      if(!isValidGuess(cur)){ toast('Not a valid word');  shake(); return; }
       if(guesses.some(g=>g.word===cur)){ toast('Already guessed'); shake(); return; }
       if(cur===secret){
         guesses.push({word:cur, shares:5, dir:'earlier'});
-        cur=''; Sound.good(); win(); render(); return;
+        cur='';  win(); render(); return;
       }
       const res = analyze(secret, cur);
       const dir = secret < cur ? 'earlier' : 'later';
       if(dir==='earlier'){ hi = (!hi || cur < hi) ? cur : hi; }
       else { lo = (!lo || cur > lo) ? cur : lo; }
       guesses.push({ word:cur, shares:res.common, dir });
-      cur=''; Sound.good();
+      cur=''; 
       render();
     }
 
     function win(){
       over=true; streak++; if(streak>best){best=streak;bestStore.set(best);} streakStore.set(streak);
-      Sound.win();
+      
       const n=guesses.length;
       finish(true, `Nailed it in ${n} guess${n>1?'es':''}.`+(n<=5?' Sharp work, detective! 🕵️':''));
     }
     function lose(){
-      over=true; streak=0; streakStore.set(0); Sound.lose();
+      over=true; streak=0; streakStore.set(0); 
       finish(false,'Case closed unsolved. Streak reset.');
     }
     function finish(didWin,msg){
@@ -198,12 +197,11 @@
       if(e.metaKey||e.ctrlKey||e.altKey) return;
       if(e.key==='Enter') submit();
       else if(e.key==='Backspace') backspace();
-      else if(/^[a-zA-Z]$/.test(e.key)){ Sound.init(); addLetter(e.key.toLowerCase()); }
+      else if(/^[a-zA-Z]$/.test(e.key)){  addLetter(e.key.toLowerCase()); }
     });
-    $('#newgame').addEventListener('click', ()=>{ Sound.init(); newGame(); });
-    $('#again').addEventListener('click', ()=>{ Sound.init(); newGame(); });
-    $('#giveup').addEventListener('click', ()=>{ if(over) return; Sound.init(); lose(); });
-    wireMute();
+    $('#newgame').addEventListener('click', ()=>{  newGame(); });
+    $('#again').addEventListener('click', ()=>{  newGame(); });
+    $('#giveup').addEventListener('click', ()=>{ if(over) return;  lose(); });
 
     newGame();
   })();
