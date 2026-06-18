@@ -8,14 +8,17 @@
 <link rel="stylesheet" href="shared.css" />
 <style>
   body{justify-content:flex-start;}
+  .wrap{height:100%;}
+  .panel{display:flex;flex-direction:column;flex:1;min-height:0;}
+  .dock{margin-top:auto;display:flex;flex-direction:column;gap:8px;}
   .rankrow{display:flex;align-items:center;gap:10px;}
   .rankname{font-weight:800;letter-spacing:.05em;min-width:96px;font-size:15px;color:var(--gold);}
   .rankbar{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;position:relative;}
   .rankbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .3s;}
   .rankpts{font-variant-numeric:tabular-nums;font-weight:800;min-width:42px;text-align:right;}
-  .found{min-height:40px;}
+  .found{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:12px;}
   .foundhead{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;margin-bottom:6px;}
-  .foundlist{display:flex;flex-wrap:wrap;gap:5px 10px;max-height:16vh;overflow:auto;}
+  .foundlist{display:flex;flex-wrap:wrap;gap:5px 10px;flex:1;min-height:0;overflow:auto;align-content:flex-start;}
   .fw{font-size:13px;text-transform:capitalize;opacity:.92;}
   .fw.pan{color:var(--gold);font-weight:800;}
   .fw.missed{color:var(--bad);opacity:.75;}
@@ -30,8 +33,8 @@
   .hex:active{transform:scale(.92);}
   .hex.center{background:linear-gradient(180deg,var(--gold),#caa01f);color:#1a1404;}
   .hex:hover:not(.center){background:rgba(45,226,230,.25);}
-  .actions{display:flex;gap:10px;justify-content:center;margin-top:6px;}
-  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px;}
+  .actions{display:flex;gap:10px;justify-content:center;}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
   .mstats{display:flex;gap:24px;justify-content:center;}
   .mstats .s{display:flex;flex-direction:column;align-items:center;}
   .mstats .s b{font-size:22px;color:var(--gold);} .mstats .s span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;}
@@ -51,25 +54,24 @@
         <div class="rankbar"><i id="rankBar" style="width:0%"></i></div>
         <span class="rankpts" id="pts">0</span>
       </div>
-      <div class="found" style="margin-top:12px">
+      <div class="found">
         <div class="foundhead"><span id="foundCount">0 words</span><span id="panCount"></span></div>
         <div class="foundlist" id="foundList"><span class="fw" style="opacity:.4">Found words appear here…</span></div>
       </div>
     </div>
 
-    <div class="entry" id="entry"></div>
-
-    <div class="hive" id="hive"></div>
-
-    <div class="actions">
-      <button class="ghost" id="del">Delete</button>
-      <button class="ghost" id="shuffle">⟳ Shuffle</button>
-      <button class="btn" id="enter">Enter</button>
-    </div>
-
-    <div class="controls">
-      <button class="ghost" id="giveup">Give up</button>
-      <button class="ghost" id="newgame">New hive</button>
+    <div class="dock">
+      <div class="entry" id="entry"></div>
+      <div class="hive" id="hive"></div>
+      <div class="actions">
+        <button class="ghost" id="del">Delete</button>
+        <button class="ghost" id="shuffle">⟳ Shuffle</button>
+        <button class="btn" id="enter">Enter</button>
+      </div>
+      <div class="controls">
+        <button class="ghost" id="giveup">Give up</button>
+        <button class="ghost" id="newgame">New hive</button>
+      </div>
     </div>
   </div>
 
