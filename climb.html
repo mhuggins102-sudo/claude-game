@@ -33,6 +33,7 @@
   .mstats{display:flex;gap:24px;justify-content:center;}
   .mstats .s{display:flex;flex-direction:column;align-items:center;}
   .mstats .s b{font-size:22px;color:var(--gold);} .mstats .s span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;}
+  .pathreveal{font-size:14px;letter-spacing:.05em;text-transform:uppercase;line-height:1.7;color:var(--good);word-break:break-word;}
 </style>
 </head>
 <body>
@@ -84,7 +85,9 @@
       <div class="msg" id="summary"></div>
       <div class="mstats"><div class="s"><b id="mSteps">0</b><span>Your steps</span></div>
         <div class="s"><b id="mPar">0</b><span>Shortest</span></div></div>
+      <div class="pathreveal" id="pathReveal"></div>
       <div class="row">
+        <button class="ghost" id="showpath">Show shortest path</button>
         <button class="btn" id="again">New puzzle</button>
       </div>
       <a class="home" style="position:static" href="index.html">← Back to games</a>
@@ -119,6 +122,14 @@
       while(h<q.length){ const w=q[h++];
         for(const nb of neighbors(w)){ if(prev[nb]===undefined){ prev[nb]=w; if(nb===target){
           let cur=nb; while(prev[cur]!==from) cur=prev[cur]; return cur; } q.push(nb); } } }
+      return null;
+    }
+    function shortestPath(from, target){
+      if(from===target) return [from];
+      const prev={[from]:null}; const q=[from]; let h=0;
+      while(h<q.length){ const w=q[h++];
+        for(const nb of neighbors(w)){ if(prev[nb]===undefined){ prev[nb]=w; if(nb===target){
+          const path=[nb]; let c=nb; while(prev[c]!==null){ c=prev[c]; path.unshift(c); } return path; } q.push(nb); } } }
       return null;
     }
 
@@ -179,7 +190,13 @@
       $('#summary').textContent = steps<=par ? 'Optimal climb — nobody could do it faster! 🌟'
                                   : `Solved in ${steps} steps (shortest is ${par}). Try for the perfect line!`;
       $('#result').textContent = steps<=par ? 'Perfect Climb! 🏔️' : 'Summit! 🏔️';
+      $('#pathReveal').innerHTML=''; $('#showpath').style.display='';
       setTimeout(()=>$('#overlay').classList.remove('hidden'),450);
+    }
+    function showPath(){
+      const path=shortestPath(start,target)||[];
+      $('#pathReveal').innerHTML='Shortest path: '+path.map(w=>w.toUpperCase()).join(' → ');
+      $('#showpath').style.display='none';
     }
     function undo(){ if(won||chain.length<=1) return; chain.pop(); cur=''; renderChain(); renderEntry(); }
     function hint(){
@@ -196,6 +213,7 @@
     buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:submit, onBack:backspace });
     $('#undo').addEventListener('click', undo);
     $('#hint').addEventListener('click', hint);
+    $('#showpath').addEventListener('click', showPath);
     $('#newgame').addEventListener('click', newGame);
     $('#again').addEventListener('click', newGame);
     $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));

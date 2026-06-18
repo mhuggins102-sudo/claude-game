@@ -46,6 +46,7 @@
       <div class="hintnote" id="hintnote"></div>
       <div class="keyboard" id="keyboard"></div>
       <div class="controls">
+        <button class="ghost" id="undo">Undo</button>
         <button class="ghost" id="hint">Hint</button>
         <button class="ghost" id="newgame">New cipher</button>
       </div>
@@ -107,7 +108,7 @@
       {t:"Practice makes perfect.", a:"Proverb"},
     ];
 
-    let quote, cipher, decipher, mapping, locked, selected, hints, solved;
+    let quote, cipher, decipher, mapping, locked, selected, hints, solved, history;
 
     function derangement(){
       const base='abcdefghijklmnopqrstuvwxyz'.split('');
@@ -123,7 +124,7 @@
       decipher = {}; for(const k in plain2cipher) decipher[plain2cipher[k]] = k; // cipher->plain (solution)
       // build cipher text (keep case display as upper)
       cipher = quote.t.toLowerCase().split('').map(ch => /[a-z]/.test(ch) ? plain2cipher[ch] : ch).join('');
-      mapping = {}; locked={}; selected=null; hints=0; solved=false;
+      mapping = {}; locked={}; selected=null; hints=0; solved=false; history=[];
       $('#overlay').classList.add('hidden');
       $('#author').innerHTML = '— <b>???</b>';
       // auto-select first letter
@@ -170,11 +171,21 @@
 
     function assign(letter){
       if(!selected || locked[selected]) return;
+      history.push({c:selected, prev:mapping[selected], wasLocked:false});
       mapping[selected]=letter;
       advance();
       render(); checkWin();
     }
-    function clearSel(){ if(!selected||locked[selected]) return; delete mapping[selected]; render(); }
+    function clearSel(){ if(!selected||locked[selected]) return;
+      history.push({c:selected, prev:mapping[selected], wasLocked:false});
+      delete mapping[selected]; render(); }
+    function undo(){
+      if(solved || !history.length) return;
+      const r=history.pop();
+      if(r.prev===undefined) delete mapping[r.c]; else mapping[r.c]=r.prev;
+      if(r.wasLocked) locked[r.c]=true; else delete locked[r.c];
+      selected=r.c; render();
+    }
     function advance(){
       // move to next letter cell that is unmapped
       const seq=[]; for(const ch of cipher){ if(/[a-z]/.test(ch) && !seq.includes(ch)) seq.push(ch); }
@@ -199,6 +210,7 @@
       const targets=present.filter(c=>mapping[c]!==decipher[c]);
       if(!targets.length) return;
       const c=targets[(Math.random()*targets.length)|0];
+      history.push({c, prev:mapping[c], wasLocked:!!locked[c]});
       mapping[c]=decipher[c]; locked[c]=true; hints++;
       // clear any other cipher wrongly mapped to this plain (to reduce confusion)
       selected=c; updateHintNote(); render(); checkWin();
@@ -211,6 +223,7 @@
       onKey:(ch)=>assign(ch), onEnter:()=>{ advance(); render(); }, onBack:clearSel
     });
 
+    $('#undo').addEventListener('click', undo);
     $('#hint').addEventListener('click', hint);
     $('#newgame').addEventListener('click', newGame);
     $('#again').addEventListener('click', newGame);

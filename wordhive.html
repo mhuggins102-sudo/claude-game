@@ -18,17 +18,16 @@
   .foundlist{display:flex;flex-wrap:wrap;gap:5px 10px;max-height:16vh;overflow:auto;}
   .fw{font-size:13px;text-transform:capitalize;opacity:.92;}
   .fw.pan{color:var(--gold);font-weight:800;}
+  .fw.missed{color:var(--bad);opacity:.75;}
   .entry{font-size:30px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;text-align:center;min-height:42px;
     display:flex;justify-content:center;align-items:center;gap:1px;}
   .entry .cur{color:var(--gold);} .entry .reg{color:var(--text);} .entry .bad{color:var(--bad);}
   .entry .ph{opacity:.25;}
-  .hive{position:relative;width:260px;height:250px;margin:2px auto;display:flex;flex-direction:column;align-items:center;}
-  .hrow{display:flex;}
-  .hrow + .hrow{margin-top:-20px;}
-  .hex{width:78px;height:86px;margin:0 4px;border:none;cursor:pointer;background:rgba(255,255,255,.09);color:var(--text);
-    font-size:30px;font-weight:800;text-transform:uppercase;
-    clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);transition:transform .06s,background .15s;}
-  .hex:active{transform:scale(.9);}
+  .hive{position:relative;width:190px;height:200px;margin:8px auto;}
+  .hex{position:absolute;width:76px;height:66px;border:none;cursor:pointer;background:rgba(255,255,255,.1);color:var(--text);
+    font-size:28px;font-weight:800;text-transform:uppercase;display:flex;align-items:center;justify-content:center;
+    clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);transition:transform .06s,background .15s;}
+  .hex:active{transform:scale(.92);}
   .hex.center{background:linear-gradient(180deg,var(--gold),#caa01f);color:#1a1404;}
   .hex:hover:not(.center){background:rgba(45,226,230,.25);}
   .actions{display:flex;gap:10px;justify-content:center;margin-top:6px;}
@@ -69,6 +68,7 @@
     </div>
 
     <div class="controls">
+      <button class="ghost" id="giveup">Give up</button>
       <button class="ghost" id="newgame">New hive</button>
     </div>
   </div>
@@ -119,7 +119,7 @@
     const bestPctStore = store('wordhive_best');
     const geniusStore  = store('wordhive_genius');
 
-    let letters, center, outer, valid, pangrams, totalPts, found, points, geniusFired;
+    let letters, center, outer, valid, pangrams, totalPts, found, points, geniusFired, gaveUp;
 
     function pointsFor(w){ let p = w.length===4 ? 1 : w.length; if(new Set(w).size===7) p+=7; return p; }
 
@@ -151,25 +151,33 @@
       if(!p){ toast('Reshuffling…'); p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1}; }
       letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts;
       outer = letters.filter(x=>x!==center);
-      found=new Set(); points=0; geniusFired=false; cur='';
+      found=new Set(); points=0; geniusFired=false; gaveUp=false; cur='';
       $('#overlay').classList.add('hidden');
+      $('#keepgoing').style.display='';
       renderHive(); renderEntry(); renderFound(); renderRank();
     }
 
     let cur='';
     function renderHive(){
       const hive=$('#hive'); hive.innerHTML='';
-      const layout=[[outer[0],outer[1]],[outer[2],center,outer[3]],[outer[4],outer[5]]];
-      layout.forEach(rowLetters=>{
-        const r=document.createElement('div'); r.className='hrow';
-        rowLetters.forEach(ch=>{
-          const b=document.createElement('button');
-          b.className='hex'+(ch===center?' center':''); b.textContent=ch;
-          b.addEventListener('click',()=>addLetter(ch));
-          r.appendChild(b);
-        });
-        hive.appendChild(r);
-      });
+      const W=76, H=66, cx=95, cy=100;            // regular flat-top hexes, snug honeycomb
+      const spots=[
+        {dx:0,  dy:0,    ch:center, center:true},
+        {dx:0,  dy:-H,   ch:outer[0]},
+        {dx:57, dy:-33,  ch:outer[1]},
+        {dx:57, dy:33,   ch:outer[2]},
+        {dx:0,  dy:H,    ch:outer[3]},
+        {dx:-57,dy:33,   ch:outer[4]},
+        {dx:-57,dy:-33,  ch:outer[5]},
+      ];
+      for(const s of spots){
+        const b=document.createElement('button');
+        b.className='hex'+(s.center?' center':''); b.textContent=s.ch;
+        b.style.left=(cx+s.dx-W/2)+'px';
+        b.style.top =(cy+s.dy-H/2)+'px';
+        b.addEventListener('click',()=>addLetter(s.ch));
+        hive.appendChild(b);
+      }
     }
     function renderEntry(){
       const e=$('#entry'); e.innerHTML='';
@@ -183,15 +191,38 @@
       }
     }
     function renderFound(){
-      $('#foundCount').textContent = found.size+' word'+(found.size!==1?'s':'');
+      $('#foundCount').textContent = gaveUp
+        ? found.size+' / '+valid.size+' found'
+        : found.size+' word'+(found.size!==1?'s':'');
       const np=[...found].filter(w=>pangrams.has(w)).length;
       $('#panCount').textContent = np? (np+' pangram'+(np!==1?'s':'')+' 🎉') : '';
       const list=$('#foundList');
+      if(gaveUp){
+        // reveal everything: found words normal, missed words in red
+        list.innerHTML='';
+        [...valid].sort().forEach(w=>{
+          const got=found.has(w);
+          const s=document.createElement('span');
+          s.className='fw'+(pangrams.has(w)?' pan':'')+(got?'':' missed');
+          s.textContent=w; list.appendChild(s);
+        });
+        return;
+      }
       if(found.size===0){ list.innerHTML='<span class="fw" style="opacity:.4">Found words appear here…</span>'; return; }
       list.innerHTML='';
       [...found].sort().forEach(w=>{
         const s=document.createElement('span'); s.className='fw'+(pangrams.has(w)?' pan':''); s.textContent=w; list.appendChild(s);
       });
+    }
+    function giveUp(){
+      if(gaveUp) return;
+      gaveUp=true; cur=''; renderEntry(); renderFound();
+      $('#keepgoing').style.display='none';
+      $('#result').textContent='Words revealed';
+      $('#mWords').textContent=found.size; $('#mPts').textContent=points;
+      $('#mPan').textContent=[...found].filter(w=>pangrams.has(w)).length;
+      $('#summary').textContent=`You found ${found.size} of ${valid.size} words. The rest are shown in red below — start a fresh hive when ready.`;
+      $('#overlay').classList.remove('hidden');
     }
     function rankFor(pct){ let name=RANKS[0][1]; for(const [t,n] of RANKS){ if(pct>=t) name=n; } return name; }
     function renderRank(){
@@ -202,11 +233,12 @@
       $('#rankBar').style.width = Math.min(100, pct/70*100)+'%';
     }
 
-    function addLetter(ch){ cur+=ch; renderEntry(); }
-    function del(){ cur=cur.slice(0,-1); renderEntry(); }
+    function addLetter(ch){ if(gaveUp) return; cur+=ch; renderEntry(); }
+    function del(){ if(gaveUp) return; cur=cur.slice(0,-1); renderEntry(); }
     function shuffle(){ for(let i=outer.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [outer[i],outer[j]]=[outer[j],outer[i]]; } renderHive(); }
 
     function enter(){
+      if(gaveUp) return;
       const w=cur.toLowerCase();
       if(w.length<4){ toast('Too short — 4+ letters'); flash(); cur=''; renderEntry(); return; }
       if(!w.includes(center)){ toast('Missing center letter'); flash(); return; }
@@ -237,6 +269,7 @@
     $('#del').addEventListener('click', del);
     $('#shuffle').addEventListener('click', shuffle);
     $('#enter').addEventListener('click', enter);
+    $('#giveup').addEventListener('click', giveUp);
     $('#newgame').addEventListener('click', newGame);
     $('#again').addEventListener('click', newGame);
     $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));

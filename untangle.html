@@ -19,6 +19,7 @@
   .slot{font-size:14px;height:20px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;}
   .slot.blank{color:rgba(255,255,255,.16);}
   .slot.blank::before{content:attr(data-dashes);}
+  .slot.missed{color:var(--accent2);opacity:.9;}
   .entry{font-size:32px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;text-align:center;min-height:44px;
     display:flex;justify-content:center;align-items:center;}
   .entry .ph{opacity:.25;font-size:18px;letter-spacing:.06em;}
@@ -57,6 +58,7 @@
       <button class="btn" id="enter">Enter</button>
     </div>
     <div class="controls">
+      <button class="ghost" id="giveup">Give up</button>
       <button class="ghost" id="newgame">New letters</button>
     </div>
   </div>
@@ -99,7 +101,7 @@
     function counts(w){ const m={}; for(const c of w) m[c]=(m[c]||0)+1; return m; }
     function formable(w, base){ const c=counts(w); for(const k in c){ if((base[k]||0)<c[k]) return false; } return true; }
 
-    let baseLetters, baseCount, valid, byLen, found, order, usedIdx, solved;
+    let baseLetters, baseCount, valid, byLen, found, order, usedIdx, solved, gaveUp;
 
     function makePuzzle(){
       for(let a=0;a<60;a++){
@@ -121,9 +123,10 @@
       baseLetters=[...p.base]; baseCount=p.bc; valid=p.valid;
       byLen={3:[],4:[],5:[],6:[]}; for(const w of valid) byLen[w.length].push(w);
       for(const k in byLen) byLen[k].sort();
-      found=new Set(); order=[...Array(6).keys()]; usedIdx=[]; solved=false;
+      found=new Set(); order=[...Array(6).keys()]; usedIdx=[]; solved=false; gaveUp=false;
       shuffleOrder();
       $('#overlay').classList.add('hidden');
+      $('#keepgoing').style.display='';
       renderCols(); renderTiles(); renderEntry(); renderProgress();
     }
 
@@ -137,7 +140,7 @@
         const b=document.createElement('button');
         b.className='tile'+(usedIdx.includes(idx)?' used':'');
         b.textContent=baseLetters[idx];
-        b.addEventListener('click',()=>{ if(!usedIdx.includes(idx)){ usedIdx.push(idx); renderTiles(); renderEntry(); } });
+        b.addEventListener('click',()=>{ if(gaveUp) return; if(!usedIdx.includes(idx)){ usedIdx.push(idx); renderTiles(); renderEntry(); } });
         t.appendChild(b);
       });
     }
@@ -159,6 +162,7 @@
         list.forEach(w=>{
           const d=document.createElement('div');
           if(found.has(w)){ d.className='slot'; d.textContent=w; }
+          else if(gaveUp){ d.className='slot missed'; d.textContent=w; }
           else { d.className='slot blank'; d.setAttribute('data-dashes','· '.repeat(len).trim()); }
           s.appendChild(d);
         });
@@ -172,11 +176,21 @@
       if(got>bestStore.get()) bestStore.set(got);
     }
 
-    function del(){ usedIdx.pop(); renderTiles(); renderEntry(); }
+    function del(){ if(gaveUp) return; usedIdx.pop(); renderTiles(); renderEntry(); }
     function clearEntry(){ usedIdx=[]; renderTiles(); renderEntry(); }
     function shuffle(){ shuffleOrder(); renderTiles(); }
 
+    function giveUp(){
+      if(gaveUp) return;
+      gaveUp=true; clearEntry(); renderCols();
+      $('#keepgoing').style.display='none';
+      $('#result').textContent='Words revealed';
+      $('#summary').textContent=`You found ${found.size} of ${valid.size} words. The rest are shown in pink — start fresh when ready.`;
+      $('#overlay').classList.remove('hidden');
+    }
+
     function enter(){
+      if(gaveUp) return;
       const w=curWord();
       if(w.length<3){ toast('Too short — 3+ letters'); flash(); return; }
       if(found.has(w)){ toast('Already found'); clearEntry(); return; }
@@ -196,6 +210,7 @@
     $('#del').addEventListener('click', del);
     $('#shuffle').addEventListener('click', shuffle);
     $('#enter').addEventListener('click', enter);
+    $('#giveup').addEventListener('click', giveUp);
     $('#newgame').addEventListener('click', newGame);
     $('#again').addEventListener('click', newGame);
     $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));
@@ -207,6 +222,7 @@
       if(e.key==='Enter'){ e.preventDefault(); enter(); }
       else if(e.key==='Backspace'){ e.preventDefault(); del(); }
       else if(/^[a-zA-Z]$/.test(e.key)){
+        if(gaveUp) return;
         const ch=e.key.toLowerCase();
         // consume first free tile with that letter
         for(const idx of order){ if(baseLetters[idx]===ch && !usedIdx.includes(idx)){ usedIdx.push(idx); renderTiles(); renderEntry(); break; } }
