@@ -25,37 +25,21 @@
   .ctile.on{border-color:var(--accent);}
   .seclabel{font-size:10px;letter-spacing:.16em;text-transform:uppercase;opacity:.45;text-align:center;margin:6px 0 2px;}
   .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:2px;}
-  details{font-size:12.5px;} summary{cursor:pointer;color:var(--accent);opacity:.85;list-style:none;}
-  summary::-webkit-details-marker{display:none;}
+  .mstats{display:flex;gap:24px;justify-content:center;}
+  .mstats .s{display:flex;flex-direction:column;align-items:center;}
+  .mstats .s b{font-size:24px;color:var(--gold);} .mstats .s span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.5;}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="top">
       <a class="home" href="index.html">← Games</a>
+      <button class="howto-link" id="howtoBtn">How to play</button>
       <div class="title">SLEUTH</div>
-      <div class="tagline">Two clues per guess — corner the secret word</div>
-    </div>
-
-    <div class="statbar">
-      <div class="s"><b id="tries">0</b><span>Guesses</span></div>
-      <div class="s"><b id="streak">0</b><span>Streak</span></div>
-      <div class="s"><b id="best">0</b><span>Best</span></div>
     </div>
 
     <div class="panel">
-      <details>
-        <summary>How to play ▾</summary>
-        <p class="help" style="margin-top:8px">
-          Find the hidden 5-letter word. Each guess returns two clues:<br>
-          <b>shares N</b> — how many letters your guess has in common with the secret (any position).<br>
-          <b style="color:var(--accent)">earlier</b> / <b style="color:var(--accent2)">later</b> — whether the secret comes
-          before or after your guess in the dictionary.<br>
-          Use both to squeeze the answer. The live range below updates automatically.
-        </p>
-      </details>
-
-      <div class="bwrap" style="margin-top:8px">
+      <div class="bwrap" style="margin-top:2px">
         <div class="lbl">The secret is somewhere between</div>
         <div class="bounds">
           <div class="b" id="lo">—</div>
@@ -78,11 +62,29 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="howto">
+    <div class="modal">
+      <h2>How to play</h2>
+      <p class="help" style="text-align:left">
+        Find the hidden 5-letter word. Each guess returns two clues:<br><br>
+        <b>shares N</b> — how many letters your guess has in common with the secret (any position).<br>
+        <b style="color:var(--accent)">↑ earlier</b> / <b style="color:var(--accent2)">↓ later</b> — whether the secret
+        comes before or after your guess in the dictionary.<br><br>
+        Use both together to squeeze the answer — the live range up top narrows automatically.
+      </p>
+      <button class="btn" id="howtoClose">Got it</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="overlay">
     <div class="modal">
       <h2 id="result">Found it!</h2>
       <div class="reveal">The word was <b id="answer">—</b></div>
       <div class="msg" id="summary"></div>
+      <div class="mstats" id="mstats" style="display:none">
+        <div class="s"><b id="mStreak">0</b><span>Streak</span></div>
+        <div class="s"><b id="mBest">0</b><span>Best</span></div>
+      </div>
       <div class="row">
         <button class="btn" id="again">Play again</button>
         <a class="ghost" href="index.html" style="display:grid;place-items:center">Home</a>
@@ -146,9 +148,6 @@
           glistEl.appendChild(it);
         }
       }
-      $('#tries').textContent=guesses.length;
-      $('#streak').textContent=streak;
-      $('#best').textContent=best;
     }
 
     function submit(){
@@ -171,12 +170,11 @@
 
     function win(){
       over=true; streak++; if(streak>best){best=streak;bestStore.set(best);} streakStore.set(streak);
-      
       const n=guesses.length;
       finish(true, `Nailed it in ${n} guess${n>1?'es':''}.`+(n<=5?' Sharp work, detective! 🕵️':''));
     }
     function lose(){
-      over=true; streak=0; streakStore.set(0); 
+      over=true; streak=0; streakStore.set(0);
       finish(false,'Case closed unsolved. Streak reset.');
     }
     function finish(didWin,msg){
@@ -184,6 +182,9 @@
       $('#result').className = didWin?'win':'lose';
       $('#answer').textContent = secret.toUpperCase();
       $('#summary').textContent = msg;
+      const ms=$('#mstats');
+      if(didWin){ $('#mStreak').textContent=streak; $('#mBest').textContent=best; ms.style.display='flex'; }
+      else { ms.style.display='none'; }
       setTimeout(()=>$('#overlay').classList.remove('hidden'),500);
     }
 
@@ -195,13 +196,16 @@
     buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:submit, onBack:backspace });
     window.addEventListener('keydown', e=>{
       if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(!$('#howto').classList.contains('hidden')){ if(e.key==='Enter'||e.key==='Escape') $('#howto').classList.add('hidden'); return; }
       if(e.key==='Enter') submit();
       else if(e.key==='Backspace') backspace();
-      else if(/^[a-zA-Z]$/.test(e.key)){  addLetter(e.key.toLowerCase()); }
+      else if(/^[a-zA-Z]$/.test(e.key)){ addLetter(e.key.toLowerCase()); }
     });
-    $('#newgame').addEventListener('click', ()=>{  newGame(); });
-    $('#again').addEventListener('click', ()=>{  newGame(); });
-    $('#giveup').addEventListener('click', ()=>{ if(over) return;  lose(); });
+    $('#newgame').addEventListener('click', newGame);
+    $('#again').addEventListener('click', newGame);
+    $('#giveup').addEventListener('click', ()=>{ if(!over) lose(); });
+    $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
+    $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
 
     newGame();
   })();

@@ -2,8 +2,9 @@
    Requires words.js (window.WORDS = { ANSWERS:[], VALID:Set }) loaded first. */
 (function(){
   "use strict";
-  const ANSWERS = window.WORDS.ANSWERS;
-  const VALID   = window.WORDS.VALID;
+  // Optional: only the 5-letter games load words.js. Other games (dict.js / none) tolerate its absence.
+  const ANSWERS = (window.WORDS && window.WORDS.ANSWERS) || [];
+  const VALID   = (window.WORDS && window.WORDS.VALID)   || new Set();
 
   const $  = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));

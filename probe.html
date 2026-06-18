@@ -37,37 +37,22 @@
   details{font-size:12.5px;} summary{cursor:pointer;color:var(--accent);opacity:.85;list-style:none;}
   summary::-webkit-details-marker{display:none;}
   .hint{font-size:11px;opacity:.5;text-align:center;}
+  .mstats{display:flex;gap:24px;justify-content:center;}
+  .mstats .s{display:flex;flex-direction:column;align-items:center;}
+  .mstats .s b{font-size:24px;color:var(--gold);} .mstats .s span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.5;}
 </style>
 </head>
 <body>
   <div class="wrap">
     <div class="top">
       <a class="home" href="index.html">← Games</a>
+      <button class="howto-link" id="howtoBtn">How to play</button>
       <div class="title">PROBE</div>
-      <div class="tagline">Spend clues wisely, then name the word</div>
-    </div>
-
-    <div class="statbar">
-      <div class="s"><b id="tokleft">7</b><span>Tokens</span></div>
-      <div class="s"><b id="streak">0</b><span>Streak</span></div>
-      <div class="s"><b id="best">0</b><span>Best</span></div>
     </div>
 
     <div class="tokens" id="tokens"></div>
 
     <div class="panel">
-      <details>
-        <summary>How to play ▾</summary>
-        <p class="help" style="margin-top:8px">
-          A 5-letter word is hidden. Spend your <b style="color:var(--gold)">7 tokens</b> on clues:<br>
-          • <b>Test a letter</b> (1) — tap a chip to learn if it's in the word.<br>
-          • <b>Reveal a slot</b> (2) — uncover the exact letter in a position.<br>
-          • <b>Count vowels</b> (1) — how many vowels it has.<br>
-          When ready, type your answer and <b>SOLVE</b>. A wrong solve costs a token —
-          run out and the case goes cold. Fewer tokens spent = higher score.
-        </p>
-      </details>
-
       <div class="board" id="board"></div>
 
       <div class="probes" style="margin-top:10px">
@@ -100,11 +85,30 @@
     </div>
   </div>
 
+  <div class="overlay hidden" id="howto">
+    <div class="modal">
+      <h2>How to play</h2>
+      <p class="help" style="text-align:left">
+        A 5-letter word is hidden. Spend your <b style="color:var(--gold)">7 tokens</b> on clues:<br><br>
+        • <b>Test a letter</b> (1) — tap a chip to learn if it's in the word.<br>
+        • <b>Reveal a slot</b> (2) — uncover the exact letter in a position.<br>
+        • <b>Count vowels</b> (1) — how many vowels it has.<br><br>
+        When ready, type your answer and <b>SOLVE</b>. A wrong solve costs a token —
+        run out and the case goes cold. Fewer tokens spent = higher score.
+      </p>
+      <button class="btn" id="howtoClose">Got it</button>
+    </div>
+  </div>
+
   <div class="overlay hidden" id="overlay">
     <div class="modal">
       <h2 id="result">Solved!</h2>
       <div class="reveal">The word was <b id="answer">—</b></div>
       <div class="msg" id="summary"></div>
+      <div class="mstats" id="mstats" style="display:none">
+        <div class="s"><b id="mStreak">0</b><span>Streak</span></div>
+        <div class="s"><b id="mBest">0</b><span>Best</span></div>
+      </div>
       <div class="row">
         <button class="btn" id="again">Play again</button>
         <a class="ghost" href="index.html" style="display:grid;place-items:center">Home</a>
@@ -143,8 +147,6 @@
     function renderTokens(){
       const t=$('#tokens'); t.innerHTML='';
       for(let i=0;i<START;i++){ const d=document.createElement('div'); d.className='tok'+(i>=tokens?' spent':''); t.appendChild(d); }
-      $('#tokleft').textContent=tokens;
-      $('#streak').textContent=streak; $('#best').textContent=best;
     }
     function renderBoard(){
       const b=$('#board'); b.innerHTML='';
@@ -244,6 +246,9 @@
       $('#result').className = didWin?'win':'lose';
       $('#answer').textContent = secret.toUpperCase();
       $('#summary').textContent = msg;
+      const ms=$('#mstats');
+      if(didWin){ $('#mStreak').textContent=streak; $('#mBest').textContent=best; ms.style.display='flex'; }
+      else { ms.style.display='none'; }
       updateControls();
       setTimeout(()=>$('#overlay').classList.remove('hidden'),500);
     }
@@ -262,15 +267,18 @@
 
     buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:solve, onBack:backspace });
     $('#vowelBtn').addEventListener('click', countVowels);
-    $('#solveBtn').addEventListener('click', ()=>{  solve(); });
-    $('#giveup').addEventListener('click', ()=>{ if(over) return;  lose(); });
-    $('#newgame').addEventListener('click', ()=>{  newGame(); });
-    $('#again').addEventListener('click', ()=>{  newGame(); });
+    $('#solveBtn').addEventListener('click', solve);
+    $('#giveup').addEventListener('click', ()=>{ if(!over) lose(); });
+    $('#newgame').addEventListener('click', newGame);
+    $('#again').addEventListener('click', newGame);
+    $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
+    $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
     window.addEventListener('keydown', e=>{
       if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(!$('#howto').classList.contains('hidden')){ if(e.key==='Enter'||e.key==='Escape') $('#howto').classList.add('hidden'); return; }
       if(e.key==='Enter') solve();
       else if(e.key==='Backspace') backspace();
-      else if(/^[a-zA-Z]$/.test(e.key)){  addLetter(e.key.toLowerCase()); }
+      else if(/^[a-zA-Z]$/.test(e.key)){ addLetter(e.key.toLowerCase()); }
     });
 
     newGame();

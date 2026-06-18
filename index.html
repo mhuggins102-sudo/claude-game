@@ -71,6 +71,10 @@
   .wordlock{--c1:#5cf2a8;--glow:rgba(92,242,168,.4);}
   .sleuth{--c1:var(--accent2);--glow:rgba(255,46,151,.4);}
   .probe{--c1:var(--gold);--glow:rgba(255,210,63,.4);}
+  .wordhive{--c1:#ffd23f;--glow:rgba(255,210,63,.4);}
+  .untangle{--c1:#b388ff;--glow:rgba(179,136,255,.4);}
+  .climb{--c1:#5cf2a8;--glow:rgba(92,242,168,.4);}
+  .decode{--c1:#ff8a5c;--glow:rgba(255,138,92,.4);}
   .section-label{grid-column:1 / -1;text-align:left;font-size:11px;letter-spacing:.24em;text-transform:uppercase;opacity:.45;margin:6px 4px -6px;}
   .stats{font-size:12px;letter-spacing:.04em;opacity:.85;min-height:16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
   .stats b{color:var(--c1);font-variant-numeric:tabular-nums;}
@@ -125,6 +129,43 @@
       <div class="stats" data-game="probe"></div>
       <span class="play">PLAY ▸</span>
     </a>
+
+    <div class="section-label">🔤 Word play</div>
+    <a class="card wordhive" href="wordhive.html">
+      <div class="icon">🐝</div>
+      <div class="name">WORDHIVE</div>
+      <div class="desc">Seven letters, one center. Spell as many words as you can and hunt the pangram. Climb from Beginner to Genius — no timer.</div>
+      <div class="tags"><span class="tag">Spelling Bee</span><span class="tag">Relaxed</span></div>
+      <div class="stats" data-game="wordhive"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+
+    <a class="card untangle" href="untangle.html">
+      <div class="icon">🔀</div>
+      <div class="name">UNTANGLE</div>
+      <div class="desc">Six scrambled letters hide dozens of words. Find them all — and uncover the full six-letter word to clear the round.</div>
+      <div class="tags"><span class="tag">Anagram</span><span class="tag">Vocab</span></div>
+      <div class="stats" data-game="untangle"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+
+    <a class="card climb" href="climb.html">
+      <div class="icon">🪜</div>
+      <div class="name">CLIMB</div>
+      <div class="desc">Turn one word into another, changing a single letter at a time. Every step a real word. Beat the shortest known path.</div>
+      <div class="tags"><span class="tag">Word ladder</span><span class="tag">Logic</span></div>
+      <div class="stats" data-game="climb"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+
+    <a class="card decode" href="decode.html">
+      <div class="icon">🔑</div>
+      <div class="name">DECODE</div>
+      <div class="desc">A famous quote, scrambled by a letter-substitution cipher. Use frequency and short words to crack the code.</div>
+      <div class="tags"><span class="tag">Cryptogram</span><span class="tag">Logic</span></div>
+      <div class="stats" data-game="decode"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
   </div>
 
   <footer>Built for fun • works on desktop &amp; mobile • no downloads</footer>
@@ -132,17 +173,21 @@
   <script>
     // Surface each game's saved progress on its card.
     const num = k => parseInt(localStorage.getItem(k) || '0', 10) || 0;
+    const none = '<span class="none">not played yet</span>';
+    const fmt = {
+      glide(){ const b=num('glide_best_v1'); return b?`🏆 Best score <b>${b}</b>`:none; },
+      wordlock: streakBest, sleuth: streakBest, probe: streakBest,
+      wordhive(){ const b=num('wordhive_best'), g=num('wordhive_genius');
+        return (b||g)?`🏆 Best <b>${b}%</b> <span class="sep">•</span> 🧠 Genius <b>${g}</b>`:none; },
+      untangle(){ const b=num('untangle_best'); return b?`🏆 Best <b>${b}</b> words found`:none; },
+      climb(){ const s=num('climb_solved'); return s?`🪜 Solved <b>${s}</b>`:none; },
+      decode(){ const s=num('decode_solved'); return s?`🔑 Cracked <b>${s}</b>`:none; },
+    };
+    function streakBest(g){ const s=num(g+'_streak'), b=num(g+'_best');
+      return (s||b)?`🔥 Streak <b>${s}</b> <span class="sep">•</span> 🏆 Best <b>${b}</b>`:none; }
     document.querySelectorAll('.stats').forEach(elm => {
       const g = elm.dataset.game;
-      if (g === 'glide') {
-        const best = num('glide_best_v1');
-        elm.innerHTML = best ? `🏆 Best score <b>${best}</b>` : `<span class="none">no score yet</span>`;
-      } else {
-        const streak = num(g + '_streak'), best = num(g + '_best');
-        elm.innerHTML = (streak || best)
-          ? `🔥 Streak <b>${streak}</b> <span class="sep">•</span> 🏆 Best <b>${best}</b>`
-          : `<span class="none">not played yet</span>`;
-      }
+      elm.innerHTML = typeof fmt[g]==='function' ? fmt[g](g) : none;
     });
   </script>
 </body>

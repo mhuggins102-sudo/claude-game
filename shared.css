@@ -25,6 +25,8 @@ body{
 .top{display:flex;flex-direction:column;gap:4px;text-align:center;position:relative;}
 .home{position:absolute;left:0;top:2px;color:var(--accent);text-decoration:none;font-size:13px;letter-spacing:.05em;opacity:.85;}
 .home:hover{opacity:1;}
+.howto-link{position:absolute;right:0;top:2px;color:var(--accent);text-decoration:none;font-size:13px;letter-spacing:.05em;opacity:.85;cursor:pointer;background:none;border:none;font-family:inherit;}
+.howto-link:hover{opacity:1;}
 .title{font-weight:800;letter-spacing:.22em;font-size:clamp(26px,7vw,38px);
   background:linear-gradient(90deg,var(--accent),var(--accent2));
   -webkit-background-clip:text;background-clip:text;color:transparent;}

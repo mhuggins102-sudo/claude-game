@@ -9,9 +9,6 @@
 <style>
   body{justify-content:flex-start;}
   .wrap{height:100%;}
-  .howto-btn{position:absolute;right:0;top:0;background:rgba(255,255,255,.05);border:1px solid rgba(234,252,255,.2);
-    color:var(--accent);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:700;letter-spacing:.03em;cursor:pointer;}
-  .howto-btn:hover{background:rgba(255,255,255,.1);}
   .panel.board{flex:1;overflow-y:auto;min-height:0;}
   .rows{display:flex;flex-direction:column;gap:8px;}
   .grow{display:flex;align-items:center;gap:10px;}
@@ -45,9 +42,8 @@
   <div class="wrap">
     <div class="top">
       <a class="home" href="index.html">← Games</a>
-      <button class="howto-btn" id="howtoBtn">How to play</button>
+      <button class="howto-link" id="howtoBtn">How to play</button>
       <div class="title">WORDLOCK</div>
-      <div class="tagline">Crack the word with logic — no colors given</div>
     </div>
 
     <div class="panel board" id="panel">

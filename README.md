@@ -1,6 +1,6 @@
 # ARCADE 🎮✨
 
-A tiny neon arcade — four self-contained browser games, zero install, zero dependencies, zero build step.
+A tiny neon arcade — **eight** self-contained browser games. Zero install, zero dependencies, zero build step.
 
 **▶ Play:** open [`index.html`](index.html) in any browser. It's the hub; pick a game.
 
@@ -8,32 +8,32 @@ A tiny neon arcade — four self-contained browser games, zero install, zero dep
 
 ## The games
 
-### ⚡ GLIDE — `glide.html`
-A juiced-up neon snake. Steer the line, swallow orbs, and chain a **combo multiplier** (up to x9) for big points. Grab time-limited golden orbs, survive escalating speed. Smooth interpolated motion, particles, screen shake, procedural sound, persistent best score.
-*Arrow keys / WASD / swipe • Space to pause • M to mute.*
+### ⚡ Reflex
+- **GLIDE** (`glide.html`) — a juiced-up neon snake. Chain a combo multiplier (up to x9), grab golden orbs, survive escalating speed. Particles, screen shake, sound.
 
-### 🧠 Three original word-deduction games
+### 🧠 Word deduction
+- **WORDLOCK** (`wordlock.html`) — Mastermind for words. Each guess returns only *in place* (🔒) and *wrong spot* (🔁) counts — no colors. Deduce the rest in 10 guesses.
+- **SLEUTH** (`sleuth.html`) — each guess returns shared-letter count **plus** whether the secret is earlier/later in the dictionary. A live range narrows as you go.
+- **PROBE** (`probe.html`) — spend a budget of clue tokens (test a letter, reveal a slot, count vowels), then name the word. Spend less, score more.
 
-None of these are Wordle — each uses a **different information mechanic**, so each is a distinct logic puzzle. All share a 5-letter dictionary (2,315 common answers, ~13k accepted guesses).
+### 🔤 Word play
+- **WORDHIVE** (`wordhive.html`) — Spelling-Bee style. Seven letters, one required center; make words, hunt the pangram, climb Beginner → Genius.
+- **UNTANGLE** (`untangle.html`) — six scrambled letters hide dozens of words; find them all, including the full 6-letter word.
+- **CLIMB** (`climb.html`) — word ladder. Change one letter at a time, every step a real word; beat the shortest known path.
+- **DECODE** (`decode.html`) — cryptogram. A famous quote scrambled by a substitution cipher; crack it with letter frequency and short words.
 
-- **🔐 WORDLOCK** (`wordlock.html`) — *Mastermind for words.* Guess a 5-letter word and you get only **two numbers**: how many letters are **in place** (🔒) and how many are **right letter, wrong spot** (🔁). No per-letter colors — you deduce which is which. A notes tracker helps. Crack it in 10 guesses.
-
-- **🕵️ SLEUTH** (`sleuth.html`) — *Two clues per guess.* Each guess returns how many letters it **shares** with the secret, **plus** whether the secret is **earlier or later** in the dictionary. Combine letter overlap with binary-search logic; a live range bound narrows automatically.
-
-- **🔎 PROBE** (`probe.html`) — *Detective with a budget.* You don't guess words — you spend **clue tokens** to interrogate the hidden word (test if a letter exists, reveal a slot, count vowels), then name it. A wrong solve costs a token. Spend fewer tokens → higher score.
-
-All four track a **streak / best** in `localStorage`. Everything works on desktop and mobile (on-screen keyboard + touch).
+Each game shows its saved progress (streak / best / solves) on its home-screen card, has a **How to play** link top-right, and works on desktop & mobile (on-screen keyboard + touch).
 
 ## Tech
 
-- Pure HTML/CSS/JS. No frameworks, no bundler, no network calls at runtime.
+- Pure HTML/CSS/JS. No frameworks, no bundler.
 - `index.html` is the hub; each game is its own page.
-- Shared layer: `shared.css` (neon theme + components), `shared.js` (dictionary helpers, deduction math, on-screen keyboard, sound, persistence), `words.js` (word data).
+- Shared layer: `shared.css` (neon theme + components), `shared.js` (deduction math, on-screen keyboard, toast, persistence).
+- Dictionaries: `words.js` (curated 5-letter answers + valid guesses, for the deduction trio) and `dict.js` (full ENABLE word list, lengths 3–12, for WORDHIVE / UNTANGLE / CLIMB). DECODE needs no dictionary — it ships with a quote set.
 - GLIDE: Canvas with a fixed-timestep logic loop + interpolated rendering.
-- Sound is synthesized at runtime via the Web Audio API — no audio assets.
 
 ## Deploy (Cloudflare Pages)
 
-It's a static site, so: Framework preset **None**, build command **blank**, output directory **`/`**. Cloudflare serves the files as-is and `index.html` becomes the homepage.
+Static site: Framework preset **None**, build command **blank**, output directory **`/`**. `index.html` becomes the homepage. The dictionaries are plain text and gzip well over the wire.
 
 Enjoy — and good luck on those streaks. 🏆

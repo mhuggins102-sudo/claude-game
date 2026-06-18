@@ -33,7 +33,7 @@
     display:flex;flex-direction:column;
   }
   header{
-    display:flex;align-items:flex-end;justify-content:space-between;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
     padding:0 4px 10px;
   }
   .title{
@@ -42,10 +42,14 @@
     -webkit-background-clip:text;background-clip:text;color:transparent;
     text-shadow:0 0 24px rgba(45,226,230,.25);
   }
-  .scores{display:flex;gap:18px;text-align:right;}
-  .scorebox .label{font-size:10px;letter-spacing:.18em;opacity:.55;text-transform:uppercase;}
-  .scorebox .val{font-size:clamp(18px,4.5vw,26px);font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05;}
-  #best .val{color:var(--gold);}
+  .navlink{color:var(--accent);text-decoration:none;font-size:13px;letter-spacing:.05em;opacity:.85;
+    background:none;border:none;font-family:inherit;cursor:pointer;flex:1;}
+  .navlink:hover{opacity:1;}
+  .navlink.right{text-align:right;}
+  #scoreHud{
+    position:absolute;right:14px;top:12px;z-index:3;text-align:right;font-variant-numeric:tabular-nums;
+    font-size:clamp(20px,5vw,28px);font-weight:800;color:var(--text);text-shadow:0 0 18px rgba(45,226,230,.4);
+  }
   .stage{
     position:relative;flex:1;border-radius:18px;overflow:hidden;
     box-shadow:0 0 0 1px rgba(45,226,230,.16), 0 24px 70px rgba(0,0,0,.55), inset 0 0 80px rgba(45,226,230,.04);
@@ -100,21 +104,33 @@
 <body>
   <div id="wrap">
     <header>
+      <a class="navlink" href="index.html">← Games</a>
       <div class="title">GLIDE</div>
-      <div class="scores">
-        <div class="scorebox" id="score"><div class="label">Score</div><div class="val">0</div></div>
-        <div class="scorebox" id="best"><div class="label">Best</div><div class="val">0</div></div>
-      </div>
+      <button class="navlink right" id="howtoBtn">How to play</button>
     </header>
 
     <div class="stage">
       <canvas id="game"></canvas>
 
+      <div id="scoreHud">0</div>
       <div id="comboWrap">
         <span id="comboMult">x2</span>
         <div id="comboBar"><i></i></div>
       </div>
       <div class="muteBtn" id="mute" title="Mute (M)">🔊</div>
+
+      <!-- How to play -->
+      <div class="overlay hidden" id="howtoScreen">
+        <h2>HOW TO PLAY</h2>
+        <p>Steer the line with the arrow keys, WASD, or swipe. Swallow orbs to grow and score.
+           Eat orbs in quick succession to build a <b style="color:var(--gold)">combo multiplier</b> — that's where
+           the big points are. Grab golden orbs for a bonus. Don't hit the walls or your own tail.</p>
+        <div class="keys">
+          <span class="key">↑ ↓ ← →</span><span class="key">W A S D</span><span class="key">Swipe</span>
+          <span class="key">Space = pause</span><span class="key">M = mute</span>
+        </div>
+        <button class="btn" id="howtoClose">BACK</button>
+      </div>
 
       <!-- Start -->
       <div class="overlay" id="startScreen">
@@ -147,7 +163,7 @@
       </div>
     </div>
 
-    <footer><a href="index.html" style="color:var(--accent);text-decoration:none">← Games</a> &nbsp;•&nbsp; Arrow keys / WASD / swipe &nbsp;•&nbsp; Space to pause &nbsp;•&nbsp; M to mute</footer>
+    <footer>Arrow keys / WASD / swipe &nbsp;•&nbsp; Space to pause &nbsp;•&nbsp; M to mute</footer>
   </div>
 
 <script>
@@ -162,11 +178,11 @@
   let DPR = Math.min(window.devicePixelRatio || 1, 2);
 
   const el = {
-    score: document.querySelector('#score .val'),
-    best: document.querySelector('#best .val'),
+    score: document.getElementById('scoreHud'),
     startScreen: document.getElementById('startScreen'),
     pauseScreen: document.getElementById('pauseScreen'),
     overScreen: document.getElementById('overScreen'),
+    howtoScreen: document.getElementById('howtoScreen'),
     finalScore: document.getElementById('finalScore'),
     finalLen: document.getElementById('finalLen'),
     finalCombo: document.getElementById('finalCombo'),
@@ -179,7 +195,6 @@
 
   const BEST_KEY = 'glide_best_v1';
   let best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0;
-  el.best.textContent = best;
 
   function resize(){
     const stage = canvas.parentElement;
@@ -289,6 +304,10 @@
     ArrowRight:[1,0], KeyD:[1,0],
   };
   window.addEventListener('keydown', e => {
+    if(!el.howtoScreen.classList.contains('hidden')){
+      if(e.code==='Escape'||e.code==='Enter'||e.code==='Space'){ e.preventDefault(); closeHelp(); }
+      return;
+    }
     if(keymap[e.code]){ e.preventDefault(); setDir(keymap[e.code][0], keymap[e.code][1]); return; }
     if(e.code==='Space'){ e.preventDefault(); togglePause(); }
     else if(e.code==='KeyM'){ Sound.toggle(); }
@@ -329,12 +348,22 @@
     if(state===State.PLAY){ state=State.PAUSE; el.pauseScreen.classList.remove('hidden'); }
     else if(state===State.PAUSE){ state=State.PLAY; el.pauseScreen.classList.add('hidden'); }
   }
+  let helpResume=false;
+  function openHelp(){
+    helpResume = (state===State.PLAY);
+    if(state===State.PLAY) state=State.PAUSE;
+    el.howtoScreen.classList.remove('hidden');
+  }
+  function closeHelp(){
+    el.howtoScreen.classList.add('hidden');
+    if(helpResume){ state=State.PLAY; helpResume=false; }
+  }
   function gameOver(){
     alive=false; state=State.OVER;
     Sound.die();
     shake = 16;
     const isBest = score>best;
-    if(isBest){ best=score; localStorage.setItem(BEST_KEY, String(best)); el.best.textContent=best; }
+    if(isBest){ best=score; localStorage.setItem(BEST_KEY, String(best)); }
     el.finalScore.textContent = score;
     el.finalLen.textContent = length;
     el.finalCombo.textContent = comboBest;
@@ -348,6 +377,8 @@
   document.getElementById('startBtn').addEventListener('click', startGame);
   document.getElementById('againBtn').addEventListener('click', startGame);
   document.getElementById('resumeBtn').addEventListener('click', togglePause);
+  document.getElementById('howtoBtn').addEventListener('click', openHelp);
+  document.getElementById('howtoClose').addEventListener('click', closeHelp);
 
   // ---------- Particles ----------
   function burst(cx, cy, color, n){

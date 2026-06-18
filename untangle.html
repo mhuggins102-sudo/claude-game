@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a16" />
+<title>UNTANGLE — find the hidden words</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body{justify-content:flex-start;}
+  .progress{display:flex;align-items:center;gap:10px;}
+  .progress .lbl{font-size:13px;font-weight:700;min-width:84px;}
+  .pbar{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;}
+  .pbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s;}
+  .cols{display:flex;gap:14px;margin-top:12px;}
+  .col{flex:1;min-width:0;}
+  .colhead{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.5;margin-bottom:6px;}
+  .slots{display:flex;flex-direction:column;gap:4px;}
+  .slot{font-size:14px;height:20px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;}
+  .slot.blank{color:rgba(255,255,255,.16);}
+  .slot.blank::before{content:attr(data-dashes);}
+  .entry{font-size:32px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;text-align:center;min-height:44px;
+    display:flex;justify-content:center;align-items:center;}
+  .entry .ph{opacity:.25;font-size:18px;letter-spacing:.06em;}
+  .tiles{display:flex;gap:8px;justify-content:center;margin:6px 0;flex-wrap:wrap;}
+  .tile{width:54px;height:60px;border-radius:11px;border:none;cursor:pointer;background:linear-gradient(180deg,#1f2748,#161a33);
+    color:var(--text);font-size:28px;font-weight:800;text-transform:uppercase;
+    box-shadow:0 5px 0 rgba(0,0,0,.35);transition:transform .06s,opacity .12s;}
+  .tile:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.35);}
+  .tile.used{opacity:.25;pointer-events:none;}
+  .actions{display:flex;gap:10px;justify-content:center;margin-top:6px;}
+  .controls{display:flex;gap:10px;justify-content:center;margin-top:8px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="home" href="index.html">← Games</a>
+      <button class="howto-link" id="howtoBtn">How to play</button>
+      <div class="title">UNTANGLE</div>
+    </div>
+
+    <div class="panel">
+      <div class="progress">
+        <span class="lbl" id="prgLbl">0 / 0</span>
+        <div class="pbar"><i id="prgBar" style="width:0%"></i></div>
+        <span style="font-size:12px;opacity:.6" id="goalNote">find a 6-letter word to win</span>
+      </div>
+      <div class="cols" id="cols"></div>
+    </div>
+
+    <div class="entry" id="entry"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="actions">
+      <button class="ghost" id="del">Delete</button>
+      <button class="ghost" id="shuffle">⟳ Shuffle</button>
+      <button class="btn" id="enter">Enter</button>
+    </div>
+    <div class="controls">
+      <button class="ghost" id="newgame">New letters</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="howto">
+    <div class="modal">
+      <h2>How to play</h2>
+      <p class="help" style="text-align:left">
+        Six scrambled letters hide dozens of words. Tap tiles (or type) to spell a word of
+        <b>3 to 6 letters</b>, then hit Enter.<br><br>
+        Each tile can be used once per word. <b>Shuffle</b> to see the letters fresh.<br><br>
+        Find a <b style="color:var(--accent2)">6-letter word</b> to clear the round — then keep going to find them all!
+      </p>
+      <button class="btn" id="howtoClose">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal">
+      <h2 id="result" class="win">Solved! 🎉</h2>
+      <div class="msg" id="summary"></div>
+      <div class="row">
+        <button class="ghost" id="keepgoing">Keep finding</button>
+        <button class="btn" id="again">New letters</button>
+      </div>
+      <a class="home" style="position:static" href="index.html">← Back to games</a>
+    </div>
+  </div>
+
+  <script src="dict.js"></script>
+  <script src="shared.js"></script>
+  <script>
+  (() => {
+    const { $, toast, store } = window.ARCADE;
+    const WORDS = window.BIGWORDS;
+    const POOL = WORDS.filter(w => w.length>=3 && w.length<=6);
+    const BASES = WORDS.filter(w => w.length===6 && new Set(w).size>=4);
+    const bestStore = store('untangle_best');
+
+    function counts(w){ const m={}; for(const c of w) m[c]=(m[c]||0)+1; return m; }
+    function formable(w, base){ const c=counts(w); for(const k in c){ if((base[k]||0)<c[k]) return false; } return true; }
+
+    let baseLetters, baseCount, valid, byLen, found, order, usedIdx, solved;
+
+    function makePuzzle(){
+      for(let a=0;a<60;a++){
+        const base = BASES[(Math.random()*BASES.length)|0];
+        const bc = counts(base);
+        const v=[];
+        for(const w of POOL){ if(formable(w,bc)) v.push(w); }
+        const six = v.filter(w=>w.length===6);
+        if(v.length>=18 && v.length<=140 && six.length>=1){
+          return { base, bc, valid:new Set(v), six };
+        }
+      }
+      return null;
+    }
+
+    function newGame(){
+      let p=null,g=0; while(!p && g++<6) p=makePuzzle();
+      if(!p){ p=makePuzzle(); }
+      baseLetters=[...p.base]; baseCount=p.bc; valid=p.valid;
+      byLen={3:[],4:[],5:[],6:[]}; for(const w of valid) byLen[w.length].push(w);
+      for(const k in byLen) byLen[k].sort();
+      found=new Set(); order=[...Array(6).keys()]; usedIdx=[]; solved=false;
+      shuffleOrder();
+      $('#overlay').classList.add('hidden');
+      renderCols(); renderTiles(); renderEntry(); renderProgress();
+    }
+
+    function shuffleOrder(){ for(let i=order.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [order[i],order[j]]=[order[j],order[i]]; } }
+
+    function curWord(){ return usedIdx.map(i=>baseLetters[i]).join(''); }
+
+    function renderTiles(){
+      const t=$('#tiles'); t.innerHTML='';
+      order.forEach(idx=>{
+        const b=document.createElement('button');
+        b.className='tile'+(usedIdx.includes(idx)?' used':'');
+        b.textContent=baseLetters[idx];
+        b.addEventListener('click',()=>{ if(!usedIdx.includes(idx)){ usedIdx.push(idx); renderTiles(); renderEntry(); } });
+        t.appendChild(b);
+      });
+    }
+    function renderEntry(){
+      const e=$('#entry'); const w=curWord();
+      if(!w){ e.innerHTML='<span class="ph">tap letters to spell a word</span>'; return; }
+      e.textContent=w;
+    }
+    function renderCols(){
+      const cols=$('#cols'); cols.innerHTML='';
+      [3,4,5,6].forEach(len=>{
+        const list=byLen[len]; if(!list.length) return;
+        const col=document.createElement('div'); col.className='col';
+        const h=document.createElement('div'); h.className='colhead';
+        const got=list.filter(w=>found.has(w)).length;
+        h.textContent=len+'-letter · '+got+'/'+list.length;
+        col.appendChild(h);
+        const s=document.createElement('div'); s.className='slots';
+        list.forEach(w=>{
+          const d=document.createElement('div');
+          if(found.has(w)){ d.className='slot'; d.textContent=w; }
+          else { d.className='slot blank'; d.setAttribute('data-dashes','· '.repeat(len).trim()); }
+          s.appendChild(d);
+        });
+        col.appendChild(s); cols.appendChild(col);
+      });
+    }
+    function renderProgress(){
+      const total=valid.size, got=found.size;
+      $('#prgLbl').textContent=got+' / '+total;
+      $('#prgBar').style.width=(total?got/total*100:0)+'%';
+      if(got>bestStore.get()) bestStore.set(got);
+    }
+
+    function del(){ usedIdx.pop(); renderTiles(); renderEntry(); }
+    function clearEntry(){ usedIdx=[]; renderTiles(); renderEntry(); }
+    function shuffle(){ shuffleOrder(); renderTiles(); }
+
+    function enter(){
+      const w=curWord();
+      if(w.length<3){ toast('Too short — 3+ letters'); flash(); return; }
+      if(found.has(w)){ toast('Already found'); clearEntry(); return; }
+      if(!valid.has(w)){ toast('Not a word here'); flash(); clearEntry(); return; }
+      found.add(w);
+      toast('+ '+w.toUpperCase()+(w.length===6?'  🎉':''), w.length===6?1700:1000);
+      clearEntry(); renderCols(); renderProgress();
+      if(w.length===6 && !solved){ solved=true; celebrate(); }
+    }
+    function celebrate(){
+      const total=valid.size;
+      $('#summary').textContent=`You found a 6-letter word! ${found.size} of ${total} words so far — hunt the rest or grab new letters.`;
+      $('#overlay').classList.remove('hidden');
+    }
+    function flash(){ const e=$('#entry'); e.classList.remove('shake'); void e.offsetWidth; e.classList.add('shake'); }
+
+    $('#del').addEventListener('click', del);
+    $('#shuffle').addEventListener('click', shuffle);
+    $('#enter').addEventListener('click', enter);
+    $('#newgame').addEventListener('click', newGame);
+    $('#again').addEventListener('click', newGame);
+    $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));
+    $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
+    $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
+    window.addEventListener('keydown', e=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(!$('#howto').classList.contains('hidden')){ if(e.key==='Enter'||e.key==='Escape') $('#howto').classList.add('hidden'); return; }
+      if(e.key==='Enter'){ e.preventDefault(); enter(); }
+      else if(e.key==='Backspace'){ e.preventDefault(); del(); }
+      else if(/^[a-zA-Z]$/.test(e.key)){
+        const ch=e.key.toLowerCase();
+        // consume first free tile with that letter
+        for(const idx of order){ if(baseLetters[idx]===ch && !usedIdx.includes(idx)){ usedIdx.push(idx); renderTiles(); renderEntry(); break; } }
+      }
+    });
+
+    newGame();
+  })();
+  </script>
+</body>
+</html>

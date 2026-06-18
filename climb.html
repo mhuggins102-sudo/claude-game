@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a16" />
+<title>CLIMB — word ladder</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body{justify-content:flex-start;}
+  .wrap{height:100%;}
+  .ends{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:4px;}
+  .endword{display:flex;gap:4px;}
+  .et{width:34px;height:40px;border-radius:7px;display:grid;place-items:center;font-size:20px;font-weight:800;text-transform:uppercase;}
+  .start .et{background:rgba(45,226,230,.18);color:var(--accent);}
+  .target .et{background:rgba(255,46,151,.18);color:var(--accent2);}
+  .ends .arrow{opacity:.4;font-size:20px;}
+  .endlbl{font-size:9px;letter-spacing:.16em;text-transform:uppercase;opacity:.5;text-align:center;margin-bottom:3px;}
+  .par{text-align:center;font-size:12px;opacity:.6;margin-bottom:6px;}
+  .par b{color:var(--gold);}
+  .chain{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:6px;align-items:center;padding:4px 0;}
+  .rung{display:flex;gap:5px;align-items:center;}
+  .ct{width:38px;height:44px;border-radius:8px;display:grid;place-items:center;font-size:20px;font-weight:800;text-transform:uppercase;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);}
+  .ct.changed{background:rgba(92,242,168,.16);border-color:rgba(92,242,168,.4);color:var(--good);}
+  .rung.target-hit .ct{background:rgba(255,46,151,.18);border-color:var(--accent2);color:var(--accent2);}
+  .entryrow{display:flex;gap:5px;justify-content:center;margin:6px 0;}
+  .it{width:38px;height:44px;border-radius:8px;display:grid;place-items:center;font-size:20px;font-weight:800;text-transform:uppercase;
+    border:2px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);}
+  .it.on{border-color:var(--accent);}
+  .dock{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:6px;}
+  .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .mstats{display:flex;gap:24px;justify-content:center;}
+  .mstats .s{display:flex;flex-direction:column;align-items:center;}
+  .mstats .s b{font-size:22px;color:var(--gold);} .mstats .s span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="home" href="index.html">← Games</a>
+      <button class="howto-link" id="howtoBtn">How to play</button>
+      <div class="title">CLIMB</div>
+    </div>
+
+    <div class="ends">
+      <div><div class="endlbl">start</div><div class="endword start" id="startWord"></div></div>
+      <span class="arrow">→</span>
+      <div><div class="endlbl">target</div><div class="endword target" id="targetWord"></div></div>
+    </div>
+    <div class="par">shortest known path: <b id="par">–</b> steps</div>
+
+    <div class="chain" id="chain"></div>
+
+    <div class="dock">
+      <div class="entryrow" id="entryrow"></div>
+      <div class="keyboard" id="keyboard"></div>
+      <div class="controls">
+        <button class="ghost" id="undo">Undo</button>
+        <button class="ghost" id="hint">Hint</button>
+        <button class="ghost" id="newgame">New puzzle</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="howto">
+    <div class="modal">
+      <h2>How to play</h2>
+      <p class="help" style="text-align:left">
+        Turn the <b style="color:var(--accent)">start</b> word into the
+        <b style="color:var(--accent2)">target</b> word, one step at a time.<br><br>
+        • Each step changes <b>exactly one letter</b>.<br>
+        • Every step must be a real word.<br>
+        • Reach the target in as few steps as you can — beat the shortest known path!<br><br>
+        Example: COLD → C<b>O</b>RD → C<b>A</b>RD → <b>W</b>ARD → WAR<b>M</b>
+      </p>
+      <button class="btn" id="howtoClose">Got it</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal">
+      <h2 id="result" class="win">Summit! 🏔️</h2>
+      <div class="msg" id="summary"></div>
+      <div class="mstats"><div class="s"><b id="mSteps">0</b><span>Your steps</span></div>
+        <div class="s"><b id="mPar">0</b><span>Shortest</span></div></div>
+      <div class="row">
+        <button class="btn" id="again">New puzzle</button>
+      </div>
+      <a class="home" style="position:static" href="index.html">← Back to games</a>
+    </div>
+  </div>
+
+  <script src="dict.js"></script>
+  <script src="shared.js"></script>
+  <script>
+  (() => {
+    const { $, toast, buildKeyboard, store } = window.ARCADE;
+    const WORD4 = window.BIGWORDS.filter(w=>w.length===4);
+    const SET4 = new Set(WORD4);
+    const solvedStore = store('climb_solved');
+
+    function neighbors(w){
+      const out=[];
+      for(let i=0;i<4;i++){ for(let c=97;c<=122;c++){ const ch=String.fromCharCode(c); if(ch===w[i]) continue;
+        const nw=w.slice(0,i)+ch+w.slice(i+1); if(SET4.has(nw)) out.push(nw); } }
+      return out;
+    }
+    function bfs(from){ // returns dist map
+      const dist={[from]:0}; const q=[from]; let h=0;
+      while(h<q.length){ const w=q[h++]; const d=dist[w];
+        for(const nb of neighbors(w)){ if(dist[nb]===undefined){ dist[nb]=d+1; q.push(nb); } } }
+      return dist;
+    }
+    function firstStepToward(from, target){
+      // BFS storing parent to reconstruct first move
+      if(from===target) return null;
+      const prev={[from]:null}; const q=[from]; let h=0;
+      while(h<q.length){ const w=q[h++];
+        for(const nb of neighbors(w)){ if(prev[nb]===undefined){ prev[nb]=w; if(nb===target){
+          let cur=nb; while(prev[cur]!==from) cur=prev[cur]; return cur; } q.push(nb); } } }
+      return null;
+    }
+
+    let start, target, par, chain, cur, won;
+
+    function makePuzzle(){
+      for(let a=0;a<200;a++){
+        const s = WORD4[(Math.random()*WORD4.length)|0];
+        const dist = bfs(s);
+        const cands = Object.keys(dist).filter(w=>dist[w]>=4 && dist[w]<=6);
+        if(cands.length){ const t=cands[(Math.random()*cands.length)|0]; return {start:s,target:t,par:dist[t]}; }
+      }
+      return {start:'cold',target:'warm',par:4};
+    }
+
+    function newGame(){
+      const p=makePuzzle(); start=p.start; target=p.target; par=p.par;
+      chain=[start]; cur=''; won=false;
+      $('#overlay').classList.add('hidden');
+      renderEnds(); renderChain(); renderEntry(); $('#par').textContent=par;
+    }
+
+    function tiles(container, word, cls, prev){
+      const row=document.createElement('div'); row.className='rung'+(cls||'');
+      for(let i=0;i<4;i++){ const t=document.createElement('div');
+        t.className='ct'+(prev && word[i]!==prev[i]?' changed':''); t.textContent=word[i]; row.appendChild(t); }
+      container.appendChild(row);
+    }
+    function smallEnds(container, word){ container.innerHTML=''; for(const ch of word){ const t=document.createElement('div'); t.className='et'; t.textContent=ch; container.appendChild(t); } }
+    function renderEnds(){ smallEnds($('#startWord'),start); smallEnds($('#targetWord'),target); }
+    function renderChain(){
+      const c=$('#chain'); c.innerHTML='';
+      chain.forEach((w,i)=> tiles(c, w, (w===target?' target-hit':''), i>0?chain[i-1]:null));
+      c.scrollTop=c.scrollHeight;
+    }
+    function renderEntry(){
+      const e=$('#entryrow'); e.innerHTML='';
+      for(let i=0;i<4;i++){ const t=document.createElement('div'); t.className='it';
+        if(cur[i]){ t.textContent=cur[i]; t.classList.add('on'); } else if(i===cur.length && !won) t.classList.add('on');
+        e.appendChild(t); }
+    }
+
+    function submit(){
+      if(won) return;
+      const w=cur.toLowerCase(); const last=chain[chain.length-1];
+      if(w.length<4){ toast('Need 4 letters'); flash(); return; }
+      if(!SET4.has(w)){ toast('Not a word'); flash(); return; }
+      let diff=0; for(let i=0;i<4;i++) if(w[i]!==last[i]) diff++;
+      if(diff!==1){ toast('Change exactly one letter'); flash(); return; }
+      if(chain.includes(w)){ toast('Already used'); flash(); return; }
+      chain.push(w); cur=''; renderChain(); renderEntry();
+      if(w===target) win();
+    }
+    function win(){
+      won=true; const steps=chain.length-1;
+      solvedStore.set(solvedStore.get()+1);
+      $('#mSteps').textContent=steps; $('#mPar').textContent=par;
+      $('#summary').textContent = steps<=par ? 'Optimal climb — nobody could do it faster! 🌟'
+                                  : `Solved in ${steps} steps (shortest is ${par}). Try for the perfect line!`;
+      $('#result').textContent = steps<=par ? 'Perfect Climb! 🏔️' : 'Summit! 🏔️';
+      setTimeout(()=>$('#overlay').classList.remove('hidden'),450);
+    }
+    function undo(){ if(won||chain.length<=1) return; chain.pop(); cur=''; renderChain(); renderEntry(); }
+    function hint(){
+      if(won) return;
+      const step=firstStepToward(chain[chain.length-1], target);
+      if(step){ cur=step; renderEntry(); toast('Try this one ↑'); }
+      else toast('No path from here — undo a step');
+    }
+    function flash(){ const e=$('#entryrow'); e.classList.remove('shake'); void e.offsetWidth; e.classList.add('shake'); }
+
+    function addLetter(ch){ if(won) return; if(cur.length<4){ cur+=ch; renderEntry(); } }
+    function backspace(){ if(won) return; cur=cur.slice(0,-1); renderEntry(); }
+
+    buildKeyboard($('#keyboard'), { onKey:addLetter, onEnter:submit, onBack:backspace });
+    $('#undo').addEventListener('click', undo);
+    $('#hint').addEventListener('click', hint);
+    $('#newgame').addEventListener('click', newGame);
+    $('#again').addEventListener('click', newGame);
+    $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
+    $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
+    window.addEventListener('keydown', e=>{
+      if(e.metaKey||e.ctrlKey||e.altKey) return;
+      if(!$('#howto').classList.contains('hidden')){ if(e.key==='Enter'||e.key==='Escape') $('#howto').classList.add('hidden'); return; }
+      if(e.key==='Enter'){ e.preventDefault(); submit(); }
+      else if(e.key==='Backspace'){ e.preventDefault(); backspace(); }
+      else if(/^[a-zA-Z]$/.test(e.key)) addLetter(e.key.toLowerCase());
+    });
+
+    newGame();
+  })();
+  </script>
+</body>
+</html>
