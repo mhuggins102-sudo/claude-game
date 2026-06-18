@@ -183,10 +183,8 @@
     function giveUp(){
       if(gaveUp) return;
       gaveUp=true; clearEntry(); renderCols();
-      $('#keepgoing').style.display='none';
-      $('#result').textContent='Words revealed';
-      $('#summary').textContent=`You found ${found.size} of ${valid.size} words. The rest are shown in pink — start fresh when ready.`;
-      $('#overlay').classList.remove('hidden');
+      // reveal inline (no blocking modal) so the words are actually visible
+      toast(`Revealed — you found ${found.size} of ${valid.size}. Missing words are in pink. Tap "New letters" to play again.`, 3200);
     }
 
     function enter(){

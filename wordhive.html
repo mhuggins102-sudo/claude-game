@@ -217,12 +217,8 @@
     function giveUp(){
       if(gaveUp) return;
       gaveUp=true; cur=''; renderEntry(); renderFound();
-      $('#keepgoing').style.display='none';
-      $('#result').textContent='Words revealed';
-      $('#mWords').textContent=found.size; $('#mPts').textContent=points;
-      $('#mPan').textContent=[...found].filter(w=>pangrams.has(w)).length;
-      $('#summary').textContent=`You found ${found.size} of ${valid.size} words. The rest are shown in red below — start a fresh hive when ready.`;
-      $('#overlay').classList.remove('hidden');
+      // reveal inline (no blocking modal) so the words are actually visible
+      toast(`Revealed — you found ${found.size} of ${valid.size}. Missing words are in red. Tap "New hive" to play again.`, 3200);
     }
     function rankFor(pct){ let name=RANKS[0][1]; for(const [t,n] of RANKS){ if(pct>=t) name=n; } return name; }
     function renderRank(){
