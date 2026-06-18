@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0a0a16" />
+<title>Words in Progress — WORDPLAY</title>
+<style>
+  :root{
+    --bg:#0a0a16;
+    --accent:#2de2e6;
+    --accent2:#ff2e97;
+    --gold:#ffd23f;
+    --text:#eafcff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html{height:100%;}
+  body{
+    background:radial-gradient(circle at 50% -10%, #1a1a3a 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    min-height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:24px 18px;gap:30px;overflow-x:hidden;position:relative;
+  }
+  .back{position:absolute;left:18px;top:20px;color:var(--accent);text-decoration:none;font-size:13px;letter-spacing:.05em;opacity:.85;}
+  .back:hover{opacity:1;}
+  .hero{text-align:center;display:flex;flex-direction:column;gap:8px;margin-top:18px;animation:rise .6s ease both;}
+  .brand{
+    font-weight:800;letter-spacing:.1em;font-size:clamp(26px,7vw,50px);line-height:1.05;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 50px rgba(45,226,230,.25);
+  }
+  .sub{opacity:.7;font-size:clamp(13px,3.4vw,15px);letter-spacing:.04em;max-width:34ch;margin:0 auto;}
+  .cards{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:22px;width:min(92vw,760px);
+  }
+  .card{
+    position:relative;display:flex;flex-direction:column;gap:14px;
+    text-decoration:none;color:var(--text);
+    padding:26px 24px 24px;border-radius:22px;overflow:hidden;
+    background:rgba(12,12,26,.6);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    transition:transform .18s ease, box-shadow .25s ease, border-color .25s;
+    animation:rise .6s ease both;
+  }
+  .card:hover{transform:translateY(-6px);border-color:var(--c1);box-shadow:0 28px 70px rgba(0,0,0,.6), 0 0 40px var(--glow);}
+  .card::before{content:"";position:absolute;inset:0;opacity:.16;z-index:0;
+    background:radial-gradient(120% 90% at 20% 0%, var(--c1), transparent 60%);transition:opacity .25s;}
+  .card:hover::before{opacity:.32;}
+  .card>*{position:relative;z-index:1;}
+  .icon{font-size:46px;filter:drop-shadow(0 0 16px var(--glow));}
+  .name{font-size:30px;font-weight:800;letter-spacing:.14em;color:var(--c1);}
+  .desc{font-size:14px;line-height:1.55;opacity:.82;min-height:44px;}
+  .tags{display:flex;gap:7px;flex-wrap:wrap;}
+  .tag{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:4px 9px;border-radius:999px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);opacity:.85;}
+  .play{margin-top:6px;align-self:flex-start;font-weight:800;letter-spacing:.14em;font-size:14px;color:#04121a;
+    background:var(--c1);padding:11px 26px;border-radius:999px;box-shadow:0 8px 26px var(--glow);}
+  .untangle{--c1:#b388ff;--glow:rgba(179,136,255,.4);}
+  .climb{--c1:#5cf2a8;--glow:rgba(92,242,168,.4);}
+  .decode{--c1:#ff8a5c;--glow:rgba(255,138,92,.4);}
+  .stats{font-size:12px;letter-spacing:.04em;opacity:.85;min-height:16px;line-height:1.7;}
+  .stats b{color:var(--c1);font-variant-numeric:tabular-nums;}
+  .stats .none{opacity:.4;font-style:italic;}
+  @keyframes rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← WORDPLAY</a>
+
+  <div class="hero">
+    <div class="brand">🚧 Words in Progress</div>
+    <div class="sub">Rough drafts — playable, but still being tuned.</div>
+  </div>
+
+  <div class="cards">
+    <a class="card untangle" href="untangle.html">
+      <div class="icon">🔀</div>
+      <div class="name">UNTANGLE</div>
+      <div class="desc">Six scrambled letters hide dozens of words. Find them all — and uncover the full six-letter word to clear the round.</div>
+      <div class="tags"><span class="tag">Anagram</span><span class="tag">Vocab</span></div>
+      <div class="stats" data-game="untangle"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+
+    <a class="card climb" href="climb.html">
+      <div class="icon">🪜</div>
+      <div class="name">CLIMB</div>
+      <div class="desc">Turn one word into another, changing a single letter at a time. Every step a real word. Beat the shortest known path.</div>
+      <div class="tags"><span class="tag">Word ladder</span><span class="tag">Logic</span></div>
+      <div class="stats" data-game="climb"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+
+    <a class="card decode" href="decode.html">
+      <div class="icon">🔑</div>
+      <div class="name">DECODE</div>
+      <div class="desc">A famous quote, scrambled by a letter-substitution cipher. Use frequency and short words to crack the code.</div>
+      <div class="tags"><span class="tag">Cryptogram</span><span class="tag">Logic</span></div>
+      <div class="stats" data-game="decode"></div>
+      <span class="play">PLAY ▸</span>
+    </a>
+  </div>
+
+  <script>
+    const num = k => parseInt(localStorage.getItem(k) || '0', 10) || 0;
+    const none = '<span class="none">not played yet</span>';
+    const fmt = {
+      untangle(){ const b=num('untangle_best'); return b?`🏆 Best <b>${b}</b> words found`:none; },
+      climb(){ const s=num('climb_solved'); return s?`🪜 Solved <b>${s}</b>`:none; },
+      decode(){ const s=num('decode_solved'); return s?`🔑 Cracked <b>${s}</b>`:none; },
+    };
+    document.querySelectorAll('.stats').forEach(elm => {
+      const g = elm.dataset.game;
+      elm.innerHTML = fmt[g] ? fmt[g]() : none;
+    });
+  </script>
+</body>
+</html>

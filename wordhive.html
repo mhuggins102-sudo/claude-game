@@ -119,16 +119,18 @@
     const hiscoreStore = store('wordhive_hiscore');
     const hipctStore   = store('wordhive_hipct');
     const playedStore  = store('wordhive_played');
+    const scoreSumStore= store('wordhive_scoresum');
+    const pctSumStore  = store('wordhive_pctsum');
 
     let letters, center, outer, valid, pangrams, totalPts, found, points, geniusFired, gaveUp;
     let roundCounted=false, started=false;
 
-    function gradeIndex(pct){ let gi=0; RANKS.forEach((r,i)=>{ if(pct>=r[0]) gi=i; }); return gi; }
     function recordRound(){
       if(roundCounted) return; roundCounted=true;
       const pct = totalPts? Math.round(points/totalPts*100):0;
-      const gs = store('wordhive_grade'+gradeIndex(pct)); gs.set(gs.get()+1);
       playedStore.set(playedStore.get()+1);
+      scoreSumStore.set(scoreSumStore.get()+points);
+      pctSumStore.set(pctSumStore.get()+pct);
     }
 
     function pointsFor(w){ let p = w.length===4 ? 1 : w.length; if(new Set(w).size===7) p+=7; return p; }
