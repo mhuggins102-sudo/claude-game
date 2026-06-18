@@ -182,9 +182,7 @@
 
     function giveUp(){
       if(gaveUp) return;
-      gaveUp=true; clearEntry(); renderCols();
-      // reveal inline (no blocking modal) so the words are actually visible
-      toast(`Revealed — you found ${found.size} of ${valid.size}. Missing words are in pink. Tap "New letters" to play again.`, 3200);
+      gaveUp=true; clearEntry(); renderCols();   // reveal happens inline on the board; no popup
     }
 
     function enter(){

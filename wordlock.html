@@ -101,6 +101,10 @@
     const MAX = 10;
     const streakStore = store('wordlock_streak');
     const bestStore   = store('wordlock_best');
+    const playedStore = store('wordlock_played');
+    const winsStore   = store('wordlock_wins');
+    const guessStore  = store('wordlock_guesssum');
+    const inc = (s,n)=>s.set(s.get()+n);
 
     let secret, guesses, cur, over, won;
     const rowsEl = $('#rows');
@@ -162,6 +166,7 @@
 
     function win(){
       over=true; won=true;
+      inc(playedStore,1); inc(winsStore,1); inc(guessStore, guesses.length);
       let streak = streakStore.get()+1; streakStore.set(streak);
       let best = bestStore.get(); if(streak>best){ best=streak; bestStore.set(best); }
       finish(true,
@@ -170,6 +175,7 @@
     }
     function lose(msg){
       over=true; won=false;
+      inc(playedStore,1); inc(guessStore,11);   // loss counts as 11
       streakStore.set(0);
       finish(false, msg+' Streak reset.', null, null);
     }

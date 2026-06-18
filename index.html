@@ -76,19 +76,23 @@
   .climb{--c1:#5cf2a8;--glow:rgba(92,242,168,.4);}
   .decode{--c1:#ff8a5c;--glow:rgba(255,138,92,.4);}
   .section-label{grid-column:1 / -1;text-align:left;font-size:11px;letter-spacing:.24em;text-transform:uppercase;opacity:.45;margin:6px 4px -6px;}
-  .stats{font-size:12px;letter-spacing:.04em;opacity:.85;min-height:16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .stats{font-size:12px;letter-spacing:.04em;opacity:.85;min-height:16px;line-height:1.7;}
   .stats b{color:var(--c1);font-variant-numeric:tabular-nums;}
   .stats .sep{opacity:.35;}
   .stats .none{opacity:.4;font-style:italic;}
   footer{opacity:.4;font-size:11px;letter-spacing:.1em;text-align:center;}
+  .cleardata{margin-top:-18px;cursor:pointer;background:none;border:1px solid rgba(255,93,108,.35);
+    color:#ff5d6c;border-radius:999px;padding:8px 18px;font-size:11px;letter-spacing:.1em;font-family:inherit;
+    opacity:.7;transition:opacity .2s,background .2s;}
+  .cleardata:hover{opacity:1;background:rgba(255,93,108,.1);}
   @keyframes rise{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
 </style>
 </head>
 <body>
   <div class="hero">
-    <div class="kicker">a tiny neon arcade</div>
-    <div class="brand">ARCADE</div>
-    <div class="sub">Six games. Zero install. Pick your poison.</div>
+    <div class="kicker">a neon word & letter playground</div>
+    <div class="brand">WORDPLAY</div>
+    <div class="sub">Six ways to twist letters into words.</div>
   </div>
 
   <div class="cards">
@@ -150,25 +154,48 @@
   </div>
 
   <footer>Built for fun • works on desktop &amp; mobile • no downloads</footer>
+  <button id="clearData" class="cleardata">Clear all saved data</button>
 
   <script>
     // Surface each game's saved progress on its card.
     const num = k => parseInt(localStorage.getItem(k) || '0', 10) || 0;
     const none = '<span class="none">not played yet</span>';
+    const RANKS = ['Beginner','Good Start','Moving Up','Good','Solid','Nice','Great','Amazing','Genius'];
+
+    function deduction(g){
+      const played=num(g+'_played'), wins=num(g+'_wins'), gsum=num(g+'_guesssum');
+      const streak=num(g+'_streak'), best=num(g+'_best');
+      if(!played && !streak && !best) return none;
+      const winpct = played ? Math.round(wins/played*100) : 0;
+      const avg = played ? (gsum/played).toFixed(1) : '–';
+      return `✅ Win <b>${winpct}%</b> <span class="sep">•</span> 🎯 Avg <b>${avg}</b>`
+           + `<br>🔥 Streak <b>${streak}</b> <span class="sep">•</span> 🏆 Best <b>${best}</b>`;
+    }
     const fmt = {
-      glide(){ const b=num('glide_best_v1'); return b?`🏆 Best score <b>${b}</b>`:none; },
-      wordlock: streakBest, sleuth: streakBest, probe: streakBest,
-      wordhive(){ const b=num('wordhive_best'), g=num('wordhive_genius');
-        return (b||g)?`🏆 Best <b>${b}%</b> <span class="sep">•</span> 🧠 Genius <b>${g}</b>`:none; },
+      wordlock: ()=>deduction('wordlock'),
+      sleuth:   ()=>deduction('sleuth'),
+      wordhive(){
+        const played=num('wordhive_played'), hiscore=num('wordhive_hiscore'), hipct=num('wordhive_hipct');
+        if(!played && !hiscore) return none;
+        const grades=[];
+        for(let i=RANKS.length-1;i>=0;i--){ const c=num('wordhive_grade'+i); if(c>0 && played) grades.push(`${RANKS[i]} ${Math.round(c/played*100)}%`); }
+        return `🏆 Best <b>${hiscore}</b> pts <span class="sep">•</span> <b>${hipct}%</b>`
+             + (grades.length ? `<br><span style="opacity:.85">${grades.join(' · ')}</span>` : '');
+      },
       untangle(){ const b=num('untangle_best'); return b?`🏆 Best <b>${b}</b> words found`:none; },
       climb(){ const s=num('climb_solved'); return s?`🪜 Solved <b>${s}</b>`:none; },
       decode(){ const s=num('decode_solved'); return s?`🔑 Cracked <b>${s}</b>`:none; },
     };
-    function streakBest(g){ const s=num(g+'_streak'), b=num(g+'_best');
-      return (s||b)?`🔥 Streak <b>${s}</b> <span class="sep">•</span> 🏆 Best <b>${b}</b>`:none; }
     document.querySelectorAll('.stats').forEach(elm => {
       const g = elm.dataset.game;
-      elm.innerHTML = typeof fmt[g]==='function' ? fmt[g](g) : none;
+      elm.innerHTML = fmt[g] ? fmt[g]() : none;
+    });
+
+    document.getElementById('clearData').addEventListener('click', () => {
+      if (confirm('Clear all saved progress — streaks, win %, best scores, everything? This cannot be undone.')) {
+        localStorage.clear();
+        location.reload();
+      }
     });
   </script>
 </body>
