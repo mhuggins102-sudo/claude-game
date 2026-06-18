@@ -14,13 +14,13 @@
     --text:#eafcff;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;}
+  html{height:100%;}
   body{
     background:radial-gradient(circle at 50% -10%, #1a1a3a 0%, var(--bg) 55%);
     color:var(--text);
     font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
     min-height:100%;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
     padding:28px 18px;gap:34px;overflow-x:hidden;
   }
   .hero{text-align:center;display:flex;flex-direction:column;gap:10px;animation:rise .6s ease both;}
@@ -88,7 +88,7 @@
   <div class="hero">
     <div class="kicker">a tiny neon arcade</div>
     <div class="brand">ARCADE</div>
-    <div class="sub">Four games. Zero install. Pick your poison.</div>
+    <div class="sub">Eight games. Zero install. Pick your poison.</div>
   </div>
 
   <div class="cards">
