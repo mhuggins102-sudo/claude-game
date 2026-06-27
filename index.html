@@ -140,11 +140,17 @@
       sleuth:   ()=>deduction('sleuth'),
       wordhive(){
         const played=num('wordhive_played'), hiscore=num('wordhive_hiscore'), hipct=num('wordhive_hipct');
-        if(!played && !hiscore) return none;
-        const avgScore = played ? Math.round(num('wordhive_scoresum')/played) : 0;
-        const avgPct   = played ? Math.round(num('wordhive_pctsum')/played) : 0;
-        return `🏆 Best <b>${hiscore}</b> pts <span class="sep">•</span> <b>${hipct}%</b>`
-             + `<br>🎯 Avg <b>${avgScore}</b> pts <span class="sep">•</span> <b>${avgPct}%</b>`;
+        const mar=num('wordhive_marathon_best');
+        if(!played && !hiscore && !mar) return none;
+        let out='';
+        if(played || hiscore){
+          const avgScore = played ? Math.round(num('wordhive_scoresum')/played) : 0;
+          const avgPct   = played ? Math.round(num('wordhive_pctsum')/played) : 0;
+          out += `🏆 Best <b>${hiscore}</b> pts <span class="sep">•</span> <b>${hipct}%</b>`
+               + `<br>🎯 Avg <b>${avgScore}</b> pts <span class="sep">•</span> <b>${avgPct}%</b>`;
+        }
+        if(mar) out += (out?'<br>':'') + `🏃 Marathon best <b>${mar}</b> rounds`;
+        return out || none;
       },
     };
     document.querySelectorAll('.stats').forEach(elm => {

@@ -11,6 +11,14 @@
   .wrap{height:100%;}
   .panel{display:flex;flex-direction:column;flex:1;min-height:0;}
   .dock{margin-top:auto;display:flex;flex-direction:column;gap:8px;}
+  .modes{display:flex;gap:8px;justify-content:center;}
+  .modebtn{cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);color:var(--text);
+    border-radius:999px;padding:7px 18px;font-size:13px;font-weight:700;letter-spacing:.06em;opacity:.7;font-family:inherit;}
+  .modebtn.active{background:linear-gradient(90deg,var(--accent),#5cf2c0);color:#04121a;opacity:1;border-color:transparent;}
+  .mhud{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .mhud #mRound{font-size:13px;font-weight:700;letter-spacing:.05em;opacity:.85;}
+  .mhud #mClock{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);}
+  .mhud.low #mClock{color:var(--bad);}
   .rankrow{display:flex;align-items:center;gap:10px;}
   .rankname{font-weight:800;letter-spacing:.05em;min-width:96px;font-size:15px;color:var(--gold);}
   .rankbar{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;position:relative;}
@@ -50,10 +58,19 @@
       <div class="title">WORDHIVE</div>
     </div>
 
+    <div class="modes">
+      <button class="modebtn active" id="modeRelaxed">Relaxed</button>
+      <button class="modebtn" id="modeMarathon">Marathon</button>
+    </div>
+
     <div class="panel">
+      <div class="mhud" id="mhud" style="display:none">
+        <span id="mRound">Round 1</span>
+        <span id="mClock">1:00</span>
+      </div>
       <div class="rankrow">
         <span class="rankname" id="rankName">Beginner</span>
-        <div class="rankbar"><span class="winmark"></span><i id="rankBar" style="width:0%"></i></div>
+        <div class="rankbar"><span class="winmark" id="winMark"></span><i id="rankBar" style="width:0%"></i></div>
         <span class="rankpts" id="pts">0</span>
       </div>
       <div class="goalnote" id="goalNote"></div>
@@ -88,8 +105,8 @@
         • A word's value comes from its <b>length</b> <b>×</b> its <b>rarity</b> — long, uncommon words are worth the most.<br>
         • A <b style="color:var(--gold)">pangram</b> (all 7 letters) earns a big bonus.<br>
         • <b>No plurals</b> — there's never an S. Other forms (-ed, -ing, -er) count when they're real words.<br><br>
-        Reach the <b>goal score</b> to clear the round, then keep climbing for a higher rank.
-        Words are everyday vocabulary — no obscure stumpers. No timer.
+        <b style="color:var(--accent)">Relaxed</b>: reach the goal score to clear, then keep climbing for a higher rank — no timer.<br>
+        <b style="color:var(--accent)">Marathon</b>: a running clock. Hit each round's goal to bank more time; the target rises every round until the clock beats you.
       </p>
       <button class="btn" id="howtoClose">Got it</button>
     </div>
@@ -99,7 +116,7 @@
     <div class="modal">
       <h2 id="result" class="win">Solved! 🎉</h2>
       <div class="msg" id="summary"></div>
-      <div class="mstats"><div class="s"><b id="mWords">0</b><span>Words</span></div>
+      <div class="mstats" id="modalStats"><div class="s"><b id="mWords">0</b><span>Words</span></div>
         <div class="s"><b id="mPts">0</b><span>Points</span></div>
         <div class="s"><b id="mPan">0</b><span>Pangrams</span></div></div>
       <div class="row">
@@ -115,27 +132,35 @@
   <script>
   (() => {
     const { $, toast, store } = window.ARCADE;
-    const WORDS = window.HIVE.words;     // ~20k most common English words (recognizable)
+    const WORDS = window.HIVE.words;     // ~40k common English words + real inflections
     const TIER  = window.HIVE.tier;      // word -> rarity 0 (common) .. 9 (rare)
     const POOL  = WORDS.filter(w => w.length>=4 && !w.includes('s'));
     const BASES = WORDS.filter(w => { if(w.length<7) return false; const s=new Set(w); return s.size===7 && !s.has('s'); });
 
-    const WIN_PCT = 50;                  // clear the round at this % of total points
+    // tuning
+    const COMMON_TIER = 6;               // tiers <= this count toward the clear target
+    const RELAXED_PCT = 60;              // relaxed: clear at this % of the common-word points
+    const MAR_START=35, MAR_STEP=8, MAR_CAP=90;   // marathon target ramp
+    const START_TIME=60, CLEAR_BONUS=30;          // marathon clock (seconds)
+    const marathonPct = r => Math.min(MAR_CAP, MAR_START + MAR_STEP*(r-1));
+
     const RANKS = [
-      [0,'Beginner'],[15,'Warming up'],[30,'Nice'],[45,'So close'],
-      [WIN_PCT,'Solved'],[65,'Great'],[80,'Amazing'],[100,'Queen Bee']
+      [0,'Beginner'],[15,'Warming up'],[30,'Nice'],[45,'Solid'],
+      [60,'Great'],[75,'Amazing'],[90,'Brilliant'],[100,'Queen Bee']
     ];
     const hiscoreStore = store('wordhive_hiscore');
     const hipctStore   = store('wordhive_hipct');
     const playedStore  = store('wordhive_played');
     const scoreSumStore= store('wordhive_scoresum');
     const pctSumStore  = store('wordhive_pctsum');
+    const marBestStore = store('wordhive_marathon_best');
 
-    let letters, center, outer, valid, pangrams, totalPts, found, points, solvedFired, gaveUp;
+    let letters, center, outer, valid, pangrams, totalPts, commonTotal, found, points, solvedFired, gaveUp;
     let roundCounted=false, started=false;
+    let mode='relaxed', targetPts=1, round=1, clock=0, timer=null, runOver=false;
 
-    function recordRound(){
-      if(roundCounted) return; roundCounted=true;
+    function recordRound(){           // relaxed-only stats
+      if(mode!=='relaxed' || roundCounted) return; roundCounted=true;
       const pct = totalPts? Math.round(points/totalPts*100):0;
       playedStore.set(playedStore.get()+1);
       scoreSumStore.set(scoreSumStore.get()+points);
@@ -156,34 +181,93 @@
         const L = [...new Set(base)];
         const c = L[(Math.random()*L.length)|0];
         const setL = new Set(L);
-        const v=[], pan=[]; let tp=0;
+        const v=[], pan=[]; let tp=0, ct=0;
         for(const w of POOL){
           if(!w.includes(c)) continue;
           let ok=true;
           for(let i=0;i<w.length;i++){ if(!setL.has(w[i])){ ok=false; break; } }
           if(!ok) continue;
-          v.push(w); const p=pointsFor(w); tp+=p;
+          const p=pointsFor(w); v.push(w); tp+=p;
+          if((TIER[w]||0)<=COMMON_TIER) ct+=p;
           if(new Set(w).size===7) pan.push(w);
         }
         if(v.length>=15 && v.length<=60 && pan.length>=1){
-          return { L, c, valid:new Set(v), pangrams:new Set(pan), totalPts:tp };
+          return { L, c, valid:new Set(v), pangrams:new Set(pan), totalPts:tp, commonTotal:ct };
         }
       }
       return null;
     }
 
-    function newGame(){
-      if(started) recordRound();   // bank the round we're leaving
+    function startRound(){
       let p=null, guard=0;
       while(!p && guard++<5) p=makePuzzle();
-      if(!p){ toast('Reshuffling…'); p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1}; }
-      letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts;
+      if(!p){ p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1,commonTotal:1}; }
+      letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts; commonTotal=p.commonTotal;
       outer = letters.filter(x=>x!==center);
-      found=new Set(); points=0; solvedFired=false; gaveUp=false; cur='';
-      roundCounted=false; started=true;
+      found=new Set(); points=0; solvedFired=false; gaveUp=false; cur=''; roundCounted=false;
+      const pct = mode==='marathon' ? marathonPct(round) : RELAXED_PCT;
+      targetPts = Math.max(1, Math.ceil(commonTotal * pct/100));
       $('#overlay').classList.add('hidden');
       $('#keepgoing').style.display='';
-      renderHive(); renderEntry(); renderFound(); renderRank();
+      renderHive(); renderEntry(); renderFound(); renderRank(); updateModeUI();
+    }
+
+    function newRelaxed(){
+      if(started) recordRound();        // bank the relaxed round we're leaving
+      stopTimer(); mode='relaxed'; started=true; runOver=false;
+      startRound();
+    }
+    function newMarathon(){
+      if(started) recordRound();
+      stopTimer(); mode='marathon'; started=true; runOver=false;
+      round=1; clock=START_TIME;
+      startRound(); updateClock(); startTimer();
+    }
+    function newGame(){ mode==='marathon' ? newMarathon() : newRelaxed(); }
+
+    // ---- marathon clock ----
+    function startTimer(){ stopTimer(); timer=setInterval(tick,100); }
+    function stopTimer(){ if(timer){ clearInterval(timer); timer=null; } }
+    function tick(){
+      if(runOver) return;
+      if(!$('#howto').classList.contains('hidden')) return;   // pause while help is open
+      clock -= 0.1;
+      if(clock<=0){ clock=0; updateClock(); marathonOver(); return; }
+      updateClock();
+    }
+    function clearRound(){
+      const cleared = round;
+      clock += CLEAR_BONUS;
+      if(cleared > marBestStore.get()) marBestStore.set(cleared);
+      round++;
+      toast(`Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`, 1500);
+      startRound();
+    }
+    function marathonOver(){
+      stopTimer(); runOver=true;
+      const cleared = round-1;
+      if(cleared > marBestStore.get()) marBestStore.set(cleared);
+      $('#result').textContent = '⏱ Time!';
+      $('#result').className = 'lose';
+      $('#summary').textContent = `You cleared ${cleared} round${cleared!==1?'s':''}.`;
+      $('#modalStats').style.display='flex';
+      $('#mWords').textContent = cleared;   $('#mWords').nextElementSibling.textContent='Rounds';
+      $('#mPts').textContent = points;      $('#mPts').nextElementSibling.textContent='Last pts';
+      $('#mPan').textContent = marBestStore.get(); $('#mPan').nextElementSibling.textContent='Best';
+      $('#keepgoing').style.display='none';
+      $('#overlay').classList.remove('hidden');
+    }
+
+    function fmt(t){ t=Math.max(0,Math.ceil(t)); const m=(t/60)|0, s=t%60; return m+':'+String(s).padStart(2,'0'); }
+    function updateClock(){ $('#mClock').textContent=fmt(clock); $('#mhud').classList.toggle('low', clock<=10); }
+    function updateModeUI(){
+      $('#modeRelaxed').classList.toggle('active', mode==='relaxed');
+      $('#modeMarathon').classList.toggle('active', mode==='marathon');
+      $('#mhud').style.display = mode==='marathon' ? 'flex' : 'none';
+      $('#newgame').textContent = mode==='marathon' ? 'New run' : 'New hive';
+      $('#again').textContent   = mode==='marathon' ? 'New run' : 'New hive';
+      $('#giveup').textContent  = mode==='marathon' ? 'End run' : 'Give up';
+      if(mode==='marathon') $('#mRound').textContent = `Round ${round} · target ${marathonPct(round)}%`;
     }
 
     let cur='';
@@ -252,18 +336,18 @@
       $('#pts').textContent = points;
       $('#rankName').textContent = rankFor(pct);
       $('#rankBar').style.width = Math.min(100, pct) + '%';
-      const target = Math.ceil(totalPts * WIN_PCT/100);
-      $('#goalNote').textContent = points>=target
-        ? `Cleared! ${points} / ${totalPts} pts — keep climbing`
-        : `${target-points} pts to clear  (${points}/${target})`;
+      $('#winMark').style.left = Math.min(100, totalPts? targetPts/totalPts*100 : 50) + '%';
+      $('#goalNote').textContent = points>=targetPts
+        ? (mode==='marathon' ? 'Goal reached!' : `Cleared! ${points} pts — keep climbing for a higher rank`)
+        : `${targetPts-points} pts to clear  (${points}/${targetPts})`;
     }
 
-    function addLetter(ch){ if(gaveUp) return; cur+=ch; renderEntry(); }
-    function del(){ if(gaveUp) return; cur=cur.slice(0,-1); renderEntry(); }
+    function addLetter(ch){ if(gaveUp||runOver) return; cur+=ch; renderEntry(); }
+    function del(){ if(gaveUp||runOver) return; cur=cur.slice(0,-1); renderEntry(); }
     function shuffle(){ for(let i=outer.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [outer[i],outer[j]]=[outer[j],outer[i]]; } renderHive(); }
 
     function enter(){
-      if(gaveUp) return;
+      if(gaveUp||runOver) return;
       const w=cur.toLowerCase();
       if(w.length<4){ toast('Too short — 4+ letters'); flash(); cur=''; renderEntry(); return; }
       if(!w.includes(center)){ toast('Missing center letter'); flash(); return; }
@@ -275,9 +359,12 @@
       const isPan=pangrams.has(w);
       toast(isPan? `PANGRAM! +${gained} 🎉` : `+${gained}${w.length>=7?' nice!':''}`, isPan?1900:1100);
       cur=''; renderEntry(); renderFound(); renderRank();
-      saveBest();
-      const pct = totalPts? points/totalPts*100 : 0;
-      if(pct>=WIN_PCT && !solvedFired){ solvedFired=true; celebrate(); }
+      if(mode==='relaxed'){
+        saveBest();
+        if(points>=targetPts && !solvedFired){ solvedFired=true; celebrate(); }
+      } else if(points>=targetPts){
+        clearRound();
+      }
     }
     function saveBest(){
       const pct = totalPts? Math.round(points/totalPts*100):0;
@@ -285,9 +372,11 @@
       if(pct>hipctStore.get()) hipctStore.set(pct);
     }
     function celebrate(){
-      $('#result').textContent='Solved! 🎉';
-      $('#mWords').textContent=found.size; $('#mPts').textContent=points;
-      $('#mPan').textContent=[...found].filter(w=>pangrams.has(w)).length;
+      $('#result').textContent='Solved! 🎉'; $('#result').className='win';
+      $('#modalStats').style.display='flex';
+      $('#mWords').textContent=found.size; $('#mWords').nextElementSibling.textContent='Words';
+      $('#mPts').textContent=points; $('#mPts').nextElementSibling.textContent='Points';
+      $('#mPan').textContent=[...found].filter(w=>pangrams.has(w)).length; $('#mPan').nextElementSibling.textContent='Pangrams';
       $('#summary').textContent='You cleared the round! Keep going for a higher rank, or start a fresh hive.';
       $('#overlay').classList.remove('hidden');
     }
@@ -296,10 +385,12 @@
     $('#del').addEventListener('click', del);
     $('#shuffle').addEventListener('click', shuffle);
     $('#enter').addEventListener('click', enter);
-    $('#giveup').addEventListener('click', giveUp);
+    $('#giveup').addEventListener('click', ()=>{ mode==='marathon' ? (!runOver && marathonOver()) : giveUp(); });
     $('#newgame').addEventListener('click', newGame);
     $('#again').addEventListener('click', newGame);
     $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));
+    $('#modeRelaxed').addEventListener('click', ()=>{ if(mode!=='relaxed') newRelaxed(); });
+    $('#modeMarathon').addEventListener('click', ()=>{ if(mode!=='marathon') newMarathon(); });
     $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
     $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
     window.addEventListener('keydown', e=>{
@@ -310,7 +401,7 @@
       else if(/^[a-zA-Z]$/.test(e.key)){ const ch=e.key.toLowerCase(); if(letters.includes(ch)) addLetter(ch); else flash(); }
     });
 
-    newGame();
+    newRelaxed();
   })();
   </script>
 </body>
