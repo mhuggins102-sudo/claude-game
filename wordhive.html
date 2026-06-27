@@ -106,8 +106,8 @@
       <div class="roundclear" id="roundClear" style="display:none">
         <div class="rcmsg" id="rcMsg">Round cleared!</div>
         <div class="rcbtns">
-          <button class="ghost" id="rcView">View words</button>
           <button class="btn" id="rcNext">Next round →</button>
+          <button class="btn" id="rcNewRun" style="display:none">New run</button>
         </div>
       </div>
     </div>
@@ -141,7 +141,6 @@
         <div class="s"><b id="mPan">0</b><span>Pangrams</span></div></div>
       <div class="row">
         <button class="ghost" id="keepgoing">Keep going</button>
-        <button class="ghost" id="viewAll" style="display:none">View words</button>
         <button class="btn" id="again">New hive</button>
       </div>
       <a class="home" style="position:static" href="index.html">← Back to games</a>
@@ -160,7 +159,7 @@
     const COMMON_TIER = 7;               // tier <= this (rank <= ~40k) = a 'goal' word; 8-9 = bonus only
     const RELAXED_PCT = 60;              // relaxed: clear at this % of the goal-word points
     const MAR_BASE=45, MAR_RAMP=35, MAR_CAPPCT=85; // marathon target: absolute pts ramp, capped at % of goal
-    const START_TIME=70, CLEAR_BONUS=30;           // marathon clock (seconds)
+    const START_TIME=60, CLEAR_BONUS=30;           // marathon clock (seconds)
     const marTarget = (r, common) => Math.min(MAR_BASE + MAR_RAMP*(r-1), Math.ceil(common*MAR_CAPPCT/100));
 
     // accept every word; bonus words (tier > COMMON_TIER) earn points but don't count toward the goal
@@ -277,18 +276,23 @@
         else { clearInterval(id); el.style.display='none'; counting=false; }
       }, 650);
     }
+    // shared dock bar shown between rounds and at game over; words auto-revealed in the panel above
+    function showRoundBar(msg, ended){
+      gaveUp = true; renderFound();              // reveal this round's words in the panel
+      $('#rcMsg').textContent = msg;
+      $('#rcNext').style.display   = ended ? 'none' : '';
+      $('#rcNewRun').style.display = ended ? '' : 'none';
+      $('#dockMain').style.display = 'none';
+      $('#roundClear').style.display = 'flex';
+    }
     function clearRound(){
       const cleared = round;
       clock += CLEAR_BONUS;
       if(cleared > marBestStore.get()) marBestStore.set(cleared);
-      awaitingNext = true;                                   // freeze clock + input until "Next round"
+      awaitingNext = true;                       // freeze clock + input until "Next round"
       updateClock();
-      $('#rcMsg').textContent = `Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`;
-      $('#rcView').style.display='';
-      $('#dockMain').style.display='none';
-      $('#roundClear').style.display='flex';
+      showRoundBar(`Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`, false);
     }
-    function viewRoundWords(){ gaveUp=true; renderFound(); $('#rcView').style.display='none'; }
     function nextRound(){
       awaitingNext=false;
       $('#roundClear').style.display='none';
@@ -300,16 +304,7 @@
       stopTimer(); runOver=true;
       const cleared = round-1;
       if(cleared > marBestStore.get()) marBestStore.set(cleared);
-      $('#result').textContent = '⏱ Time!';
-      $('#result').className = 'lose';
-      $('#summary').textContent = `You cleared ${cleared} round${cleared!==1?'s':''}.`;
-      $('#modalStats').style.display='flex';
-      $('#mWords').textContent = cleared;   $('#mWords').nextElementSibling.textContent='Rounds';
-      $('#mPts').textContent = points;      $('#mPts').nextElementSibling.textContent='Last pts';
-      $('#mPan').textContent = marBestStore.get(); $('#mPan').nextElementSibling.textContent='Best';
-      $('#keepgoing').style.display='none';
-      $('#viewAll').style.display='';
-      $('#overlay').classList.remove('hidden');
+      showRoundBar(`⏱ Time! You cleared ${cleared} round${cleared!==1?'s':''} · best ${marBestStore.get()}`, true);
     }
 
     function fmt(t){ t=Math.max(0,Math.ceil(t)); const m=(t/60)|0, s=t%60; return m+':'+String(s).padStart(2,'0'); }
@@ -391,15 +386,25 @@
     }
     function rankFor(pct){ let name=RANKS[0][1]; for(const [t,n] of RANKS){ if(pct>=t) name=n; } return name; }
     function renderRank(){
-      const base = commonTotal||1;                 // measure progress against the goal points
-      const pct = points/base*100;
       $('#pts').textContent = points;
-      $('#rankName').textContent = rankFor(pct);
-      $('#rankBar').style.width = Math.min(100, pct) + '%';
-      $('#winMark').style.left = Math.min(100, targetPts/base*100) + '%';
-      $('#goalNote').textContent = points>=targetPts
-        ? (mode==='marathon' ? 'Goal reached!' : `Cleared! ${points} pts — keep climbing for a higher rank`)
-        : `${targetPts-points} pts to clear  (${points}/${targetPts})`;
+      if(mode==='marathon'){
+        // the round goal is the full bar; no ranks
+        $('#rankName').style.display='none';
+        $('#winMark').style.display='none';
+        $('#rankBar').style.width = Math.min(100, points/(targetPts||1)*100) + '%';
+        $('#goalNote').textContent = points>=targetPts ? 'Goal reached! ✓' : `${targetPts-points} pts to clear  (${points}/${targetPts})`;
+      } else {
+        const base = commonTotal||1;               // relaxed: progress vs all goal points, with a marker at the clear line
+        const pct = points/base*100;
+        $('#rankName').style.display='';
+        $('#rankName').textContent = rankFor(pct);
+        $('#winMark').style.display='';
+        $('#winMark').style.left = Math.min(100, targetPts/base*100) + '%';
+        $('#rankBar').style.width = Math.min(100, pct) + '%';
+        $('#goalNote').textContent = points>=targetPts
+          ? `Cleared! ${points} pts — keep climbing for a higher rank`
+          : `${targetPts-points} pts to clear  (${points}/${targetPts})`;
+      }
     }
 
     function blocked(){ return gaveUp||runOver||counting||awaitingNext; }
@@ -434,7 +439,6 @@
     }
     function celebrate(){
       $('#result').textContent='Solved! 🎉'; $('#result').className='win';
-      $('#viewAll').style.display='none';
       $('#modalStats').style.display='flex';
       $('#mWords').textContent=found.size; $('#mWords').nextElementSibling.textContent='Words';
       $('#mPts').textContent=points; $('#mPts').nextElementSibling.textContent='Points';
@@ -453,9 +457,8 @@
     $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));
     $('#modeRelaxed').addEventListener('click', ()=>{ if(mode!=='relaxed') newRelaxed(); });
     $('#modeMarathon').addEventListener('click', ()=>{ if(mode!=='marathon') newMarathon(); });
-    $('#rcView').addEventListener('click', viewRoundWords);
     $('#rcNext').addEventListener('click', nextRound);
-    $('#viewAll').addEventListener('click', ()=>{ gaveUp=true; renderFound(); $('#overlay').classList.add('hidden'); });
+    $('#rcNewRun').addEventListener('click', newMarathon);
     $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
     $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
     window.addEventListener('keydown', e=>{
