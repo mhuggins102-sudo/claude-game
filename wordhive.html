@@ -126,7 +126,7 @@
         • A <b style="color:var(--gold)">pangram</b> (all 7 letters) earns a big bonus.<br>
         • <b>No plurals</b> — there's never an S. Other forms (-ed, -ing, -er) count when they're real words.<br><br>
         <b style="color:var(--accent)">Relaxed</b>: reach the goal score to clear, then keep climbing for a higher rank — no timer.<br>
-        <b style="color:var(--accent)">Marathon</b>: a running clock. Hit each round's goal to bank more time; the target rises every round until the clock beats you.
+        <b style="color:var(--accent)">Marathon</b>: 60s a round, and any unused time carries over. Hit each round's goal (20 pts, then +10 each round) to roll into the next — the rising goal eventually beats the clock.
       </p>
       <button class="btn" id="howtoClose">Got it</button>
     </div>
@@ -158,8 +158,8 @@
     // tuning
     const COMMON_TIER = 7;               // tier <= this (rank <= ~40k) = a 'goal' word; 8-9 = bonus only
     const RELAXED_PCT = 60;              // relaxed: clear at this % of the goal-word points
-    const MAR_BASE=45, MAR_RAMP=35, MAR_CAPPCT=85; // marathon target: absolute pts ramp, capped at % of goal
-    const START_TIME=60, CLEAR_BONUS=30;           // marathon clock (seconds)
+    const MAR_BASE=20, MAR_RAMP=10, MAR_CAPPCT=85; // marathon target: 20 pts, +10/round, capped at % of goal
+    const START_TIME=60, CLEAR_BONUS=60;           // 60s a round; unused time carries over (clear adds a fresh 60s)
     const marTarget = (r, common) => Math.min(MAR_BASE + MAR_RAMP*(r-1), Math.ceil(common*MAR_CAPPCT/100));
 
     // accept every word; bonus words (tier > COMMON_TIER) earn points but don't count toward the goal
@@ -287,11 +287,12 @@
     }
     function clearRound(){
       const cleared = round;
+      const carried = Math.max(0, Math.ceil(clock));   // unused time, carried into next round
       clock += CLEAR_BONUS;
       if(cleared > marBestStore.get()) marBestStore.set(cleared);
-      awaitingNext = true;                       // freeze clock + input until "Next round"
+      awaitingNext = true;                             // freeze clock + input until "Next round"
       updateClock();
-      showRoundBar(`Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`, false);
+      showRoundBar(`Round ${cleared} cleared!  ${carried}s carried over + 60s ⏱`, false);
     }
     function nextRound(){
       awaitingNext=false;
