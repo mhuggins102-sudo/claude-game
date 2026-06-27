@@ -11,7 +11,7 @@ A tiny neon collection of word & letter games. Zero install, zero dependencies, 
 ### Core three (home screen)
 - **WORDLOCK** (`wordlock.html`) — Mastermind for words. Each guess returns only *in place* (🔒) and *wrong spot* (🔁) counts — no colors. Deduce the rest within 10 guesses.
 - **SLEUTH** (`sleuth.html`) — each guess returns how many letters it **shares** with the secret **plus** whether the secret is **earlier or later** in the dictionary. A live range narrows as you go. 10 guesses.
-- **WORDHIVE** (`wordhive.html`) — Spelling-Bee style. Seven letters, one required center; make words, hunt the pangram, climb Beginner → Genius. No timer.
+- **WORDHIVE** (`wordhive.html`) — Spelling-Bee style. Seven letters, one required center; reach the **goal score** to clear the round, then keep climbing for higher ranks. Word value combines **length × rarity** (+ a pangram bonus), and the vocabulary is the ~20k most common English words — recognizable, no obscure stumpers. No timer.
 
 Each card on the home screen surfaces your saved stats (win % / average / streak / best, or best & average score for WORDHIVE), and there's a **Clear all saved data** button at the bottom.
 
@@ -28,7 +28,7 @@ Rougher, still-being-tuned games, linked from the bottom of the home screen:
 - Pure HTML/CSS/JS. No frameworks, no bundler, no runtime network calls.
 - `index.html` / `more.html` are static hubs; each game is its own page.
 - Shared layer: `shared.css` (neon theme + components) and `shared.js` (deduction math, on-screen keyboard, toast, persistence).
-- Dictionaries: `words.js` (curated 5-letter answers + valid guesses, for WORDLOCK / SLEUTH) and `dict.js` (full ENABLE word list, lengths 3–12, for WORDHIVE / UNTANGLE / CLIMB). DECODE ships its own quote set.
+- Dictionaries: `words.js` (curated 5-letter answers + valid guesses, for WORDLOCK / SLEUTH), `dict.js` (full ENABLE word list, lengths 3–12, for UNTANGLE / CLIMB), and `wordhive-words.js` (the ~20k most common English words with rarity tiers, for WORDHIVE's scoring). DECODE ships its own quote set.
 - Stats persist in `localStorage`.
 
 ## Deploy (Cloudflare Pages)

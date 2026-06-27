@@ -15,7 +15,9 @@
   .rankname{font-weight:800;letter-spacing:.05em;min-width:96px;font-size:15px;color:var(--gold);}
   .rankbar{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;position:relative;}
   .rankbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width .3s;}
+  .winmark{position:absolute;left:50%;top:-3px;width:2px;height:14px;background:var(--text);opacity:.55;transform:translateX(-1px);border-radius:2px;z-index:2;}
   .rankpts{font-variant-numeric:tabular-nums;font-weight:800;min-width:42px;text-align:right;}
+  .goalnote{text-align:center;font-size:11px;letter-spacing:.05em;opacity:.6;margin-top:6px;}
   .found{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:12px;}
   .foundhead{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.5;margin-bottom:6px;}
   .foundlist{display:flex;flex-wrap:wrap;gap:5px 10px;flex:1;min-height:0;overflow:auto;align-content:flex-start;}
@@ -51,9 +53,10 @@
     <div class="panel">
       <div class="rankrow">
         <span class="rankname" id="rankName">Beginner</span>
-        <div class="rankbar"><i id="rankBar" style="width:0%"></i></div>
+        <div class="rankbar"><span class="winmark"></span><i id="rankBar" style="width:0%"></i></div>
         <span class="rankpts" id="pts">0</span>
       </div>
+      <div class="goalnote" id="goalNote"></div>
       <div class="found">
         <div class="foundhead"><span id="foundCount">0 words</span><span id="panCount"></span></div>
         <div class="foundlist" id="foundList"><span class="fw" style="opacity:.4">Found words appear here…</span></div>
@@ -82,8 +85,10 @@
         Build words of <b>4+ letters</b> using only the seven letters in the hive.<br><br>
         • Every word <b>must include the center letter</b> (gold).<br>
         • Letters can be reused.<br>
-        • Longer words score more; a <b style="color:var(--gold)">pangram</b> uses all 7 letters for a big bonus.<br><br>
-        Climb the ranks from Beginner to <b style="color:var(--gold)">Genius</b>. There's no timer — take your time.
+        • A word's value comes from its <b>length</b> <b>×</b> its <b>rarity</b> — long, uncommon words are worth the most.<br>
+        • A <b style="color:var(--gold)">pangram</b> (all 7 letters) earns a big bonus.<br><br>
+        Reach the <b>goal score</b> to clear the round, then keep climbing for a higher rank.
+        Words are everyday vocabulary — no obscure stumpers. No timer.
       </p>
       <button class="btn" id="howtoClose">Got it</button>
     </div>
@@ -91,7 +96,7 @@
 
   <div class="overlay hidden" id="overlay">
     <div class="modal">
-      <h2 id="result" class="win">Genius! 🧠</h2>
+      <h2 id="result" class="win">Solved! 🎉</h2>
       <div class="msg" id="summary"></div>
       <div class="mstats"><div class="s"><b id="mWords">0</b><span>Words</span></div>
         <div class="s"><b id="mPts">0</b><span>Points</span></div>
@@ -104,19 +109,20 @@
     </div>
   </div>
 
-  <script src="dict.js"></script>
+  <script src="wordhive-words.js"></script>
   <script src="shared.js"></script>
   <script>
   (() => {
     const { $, toast, store } = window.ARCADE;
-    const WORDS = window.BIGWORDS;
-    // words usable in a no-S hive (center always non-S): length>=4 and no 's'
-    const POOL = WORDS.filter(w => w.length>=4 && !w.includes('s'));
+    const WORDS = window.HIVE.words;     // ~20k most common English words (recognizable)
+    const TIER  = window.HIVE.tier;      // word -> rarity 0 (common) .. 9 (rare)
+    const POOL  = WORDS.filter(w => w.length>=4 && !w.includes('s'));
     const BASES = WORDS.filter(w => { if(w.length<7) return false; const s=new Set(w); return s.size===7 && !s.has('s'); });
 
+    const WIN_PCT = 50;                  // clear the round at this % of total points
     const RANKS = [
-      [0,'Beginner'],[2,'Good Start'],[5,'Moving Up'],[8,'Good'],[15,'Solid'],
-      [25,'Nice'],[40,'Great'],[50,'Amazing'],[70,'Genius']
+      [0,'Beginner'],[15,'Warming up'],[30,'Nice'],[45,'So close'],
+      [WIN_PCT,'Solved'],[65,'Great'],[80,'Amazing'],[100,'Queen Bee']
     ];
     const hiscoreStore = store('wordhive_hiscore');
     const hipctStore   = store('wordhive_hipct');
@@ -124,7 +130,7 @@
     const scoreSumStore= store('wordhive_scoresum');
     const pctSumStore  = store('wordhive_pctsum');
 
-    let letters, center, outer, valid, pangrams, totalPts, found, points, geniusFired, gaveUp;
+    let letters, center, outer, valid, pangrams, totalPts, found, points, solvedFired, gaveUp;
     let roundCounted=false, started=false;
 
     function recordRound(){
@@ -135,7 +141,13 @@
       pctSumStore.set(pctSumStore.get()+pct);
     }
 
-    function pointsFor(w){ let p = w.length===4 ? 1 : w.length; if(new Set(w).size===7) p+=7; return p; }
+    // word value = length curve × rarity multiplier (+ pangram bonus)
+    function lenScore(L){ return Math.max(1, Math.round(Math.pow(L-3, 1.4))); }
+    function pointsFor(w){
+      let v = Math.max(1, Math.round(lenScore(w.length) * (1 + (TIER[w]||0)/9)));
+      if(new Set(w).size===7) v += 12;   // pangram bonus
+      return v;
+    }
 
     function makePuzzle(){
       for(let attempt=0; attempt<80; attempt++){
@@ -152,7 +164,7 @@
           v.push(w); const p=pointsFor(w); tp+=p;
           if(new Set(w).size===7) pan.push(w);
         }
-        if(v.length>=20 && v.length<=85 && pan.length>=1 && pan.length<=6){
+        if(v.length>=15 && v.length<=60 && pan.length>=1){
           return { L, c, valid:new Set(v), pangrams:new Set(pan), totalPts:tp };
         }
       }
@@ -166,7 +178,7 @@
       if(!p){ toast('Reshuffling…'); p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1}; }
       letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts;
       outer = letters.filter(x=>x!==center);
-      found=new Set(); points=0; geniusFired=false; gaveUp=false; cur='';
+      found=new Set(); points=0; solvedFired=false; gaveUp=false; cur='';
       roundCounted=false; started=true;
       $('#overlay').classList.add('hidden');
       $('#keepgoing').style.display='';
@@ -235,11 +247,14 @@
     }
     function rankFor(pct){ let name=RANKS[0][1]; for(const [t,n] of RANKS){ if(pct>=t) name=n; } return name; }
     function renderRank(){
-      const pct = totalPts? Math.round(points/totalPts*100) : 0;
-      $('#pts').textContent=points;
-      $('#rankName').textContent=rankFor(pct);
-      // bar fills toward Genius (70%)
-      $('#rankBar').style.width = Math.min(100, pct/70*100)+'%';
+      const pct = totalPts? points/totalPts*100 : 0;
+      $('#pts').textContent = points;
+      $('#rankName').textContent = rankFor(pct);
+      $('#rankBar').style.width = Math.min(100, pct) + '%';
+      const target = Math.ceil(totalPts * WIN_PCT/100);
+      $('#goalNote').textContent = points>=target
+        ? `Cleared! ${points} / ${totalPts} pts — keep climbing`
+        : `${target-points} pts to clear  (${points}/${target})`;
     }
 
     function addLetter(ch){ if(gaveUp) return; cur+=ch; renderEntry(); }
@@ -261,7 +276,7 @@
       cur=''; renderEntry(); renderFound(); renderRank();
       saveBest();
       const pct = totalPts? points/totalPts*100 : 0;
-      if(pct>=70 && !geniusFired){ geniusFired=true; celebrate(); }
+      if(pct>=WIN_PCT && !solvedFired){ solvedFired=true; celebrate(); }
     }
     function saveBest(){
       const pct = totalPts? Math.round(points/totalPts*100):0;
@@ -269,9 +284,10 @@
       if(pct>hipctStore.get()) hipctStore.set(pct);
     }
     function celebrate(){
+      $('#result').textContent='Solved! 🎉';
       $('#mWords').textContent=found.size; $('#mPts').textContent=points;
       $('#mPan').textContent=[...found].filter(w=>pangrams.has(w)).length;
-      $('#summary').textContent='You hit Genius! Keep going for Queen Bee (every word), or start a fresh hive.';
+      $('#summary').textContent='You cleared the round! Keep going for a higher rank, or start a fresh hive.';
       $('#overlay').classList.remove('hidden');
     }
     function flash(){ const e=$('#entry'); e.classList.remove('shake'); void e.offsetWidth; e.classList.add('shake'); }
