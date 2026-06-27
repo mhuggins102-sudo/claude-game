@@ -32,6 +32,15 @@
   .fw{font-size:13px;text-transform:capitalize;opacity:.92;}
   .fw.pan{color:var(--gold);font-weight:800;}
   .fw.missed{color:var(--bad);opacity:.75;}
+  .fw.bonus{color:var(--accent);}
+  #dockMain{display:flex;flex-direction:column;gap:8px;}
+  .roundclear{display:flex;flex-direction:column;gap:12px;align-items:center;padding:16px;border-radius:16px;
+    background:rgba(92,242,168,.08);border:1px solid rgba(92,242,168,.3);}
+  .roundclear .rcmsg{font-weight:800;font-size:17px;color:var(--good);letter-spacing:.02em;text-align:center;}
+  .roundclear .rcbtns{display:flex;gap:10px;}
+  .countdown{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+    font-size:26vw;font-weight:800;color:var(--gold);text-shadow:0 0 50px rgba(255,210,63,.55);
+    background:rgba(6,6,16,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}
   .entry{font-size:30px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;text-align:center;min-height:42px;
     display:flex;justify-content:center;align-items:center;gap:1px;}
   .entry .cur{color:var(--gold);} .entry .reg{color:var(--text);} .entry .bad{color:var(--bad);}
@@ -81,19 +90,30 @@
     </div>
 
     <div class="dock">
-      <div class="entry" id="entry"></div>
-      <div class="hive" id="hive"></div>
-      <div class="actions">
-        <button class="ghost" id="del">Delete</button>
-        <button class="ghost" id="shuffle">⟳ Shuffle</button>
-        <button class="btn" id="enter">Enter</button>
+      <div id="dockMain">
+        <div class="entry" id="entry"></div>
+        <div class="hive" id="hive"></div>
+        <div class="actions">
+          <button class="ghost" id="del">Delete</button>
+          <button class="ghost" id="shuffle">⟳ Shuffle</button>
+          <button class="btn" id="enter">Enter</button>
+        </div>
+        <div class="controls">
+          <button class="ghost" id="giveup">Give up</button>
+          <button class="ghost" id="newgame">New hive</button>
+        </div>
       </div>
-      <div class="controls">
-        <button class="ghost" id="giveup">Give up</button>
-        <button class="ghost" id="newgame">New hive</button>
+      <div class="roundclear" id="roundClear" style="display:none">
+        <div class="rcmsg" id="rcMsg">Round cleared!</div>
+        <div class="rcbtns">
+          <button class="ghost" id="rcView">View words</button>
+          <button class="btn" id="rcNext">Next round →</button>
+        </div>
       </div>
     </div>
   </div>
+
+  <div class="countdown" id="countdown" style="display:none">3</div>
 
   <div class="overlay hidden" id="howto">
     <div class="modal">
@@ -102,7 +122,7 @@
         Build words of <b>4+ letters</b> using only the seven letters in the hive.<br><br>
         • Every word <b>must include the center letter</b> (gold).<br>
         • Letters can be reused.<br>
-        • A word's value comes from its <b>length</b> <b>×</b> its <b>rarity</b> — long, uncommon words are worth the most.<br>
+        • A word's value = its <b>length</b> <b>×</b> its <b>rarity</b>. Everyday words count toward the goal; rarer words are still accepted for <b style="color:var(--accent)">bonus</b> points.<br>
         • A <b style="color:var(--gold)">pangram</b> (all 7 letters) earns a big bonus.<br>
         • <b>No plurals</b> — there's never an S. Other forms (-ed, -ing, -er) count when they're real words.<br><br>
         <b style="color:var(--accent)">Relaxed</b>: reach the goal score to clear, then keep climbing for a higher rank — no timer.<br>
@@ -132,17 +152,21 @@
   <script>
   (() => {
     const { $, toast, store } = window.ARCADE;
-    const WORDS = window.HIVE.words;     // ~40k common English words + real inflections
+    const WORDS = window.HIVE.words;     // every genuinely-used English word (no 'S')
     const TIER  = window.HIVE.tier;      // word -> rarity 0 (common) .. 9 (rare)
-    const POOL  = WORDS.filter(w => w.length>=4 && !w.includes('s'));
-    const BASES = WORDS.filter(w => { if(w.length<7) return false; const s=new Set(w); return s.size===7 && !s.has('s'); });
 
     // tuning
-    const COMMON_TIER = 6;               // tiers <= this count toward the clear target
-    const RELAXED_PCT = 60;              // relaxed: clear at this % of the common-word points
+    const COMMON_TIER = 7;               // tier <= this (rank <= ~40k) = a 'goal' word; 8-9 = bonus only
+    const RELAXED_PCT = 60;              // relaxed: clear at this % of the goal-word points
     const MAR_START=35, MAR_STEP=8, MAR_CAP=90;   // marathon target ramp
     const START_TIME=60, CLEAR_BONUS=30;          // marathon clock (seconds)
     const marathonPct = r => Math.min(MAR_CAP, MAR_START + MAR_STEP*(r-1));
+
+    // accept every word; bonus words (tier > COMMON_TIER) earn points but don't count toward the goal
+    const POOL  = WORDS;
+    const maskOf = w => { let m=0; for(const c of w) m|=1<<(c.charCodeAt(0)-97); return m; };
+    const PMASK = POOL.map(maskOf);
+    const BASES = WORDS.filter(w => { if(w.length<7) return false; const s=new Set(w); return s.size===7 && (TIER[w]||0)<=COMMON_TIER; });
 
     const RANKS = [
       [0,'Beginner'],[15,'Warming up'],[30,'Nice'],[45,'Solid'],
@@ -155,13 +179,13 @@
     const pctSumStore  = store('wordhive_pctsum');
     const marBestStore = store('wordhive_marathon_best');
 
-    let letters, center, outer, valid, pangrams, totalPts, commonTotal, found, points, solvedFired, gaveUp;
+    let letters, center, outer, valid, pangrams, totalPts, commonTotal, goalCount, found, points, solvedFired, gaveUp;
     let roundCounted=false, started=false;
-    let mode='relaxed', targetPts=1, round=1, clock=0, timer=null, runOver=false;
+    let mode='relaxed', targetPts=1, round=1, clock=0, timer=null, runOver=false, counting=false, awaitingNext=false;
 
-    function recordRound(){           // relaxed-only stats
-      if(mode!=='relaxed' || roundCounted) return; roundCounted=true;
-      const pct = totalPts? Math.round(points/totalPts*100):0;
+    function recordRound(){           // relaxed-only stats; skip untouched rounds
+      if(mode!=='relaxed' || roundCounted || points<=0) return; roundCounted=true;
+      const pct = commonTotal? Math.round(points/commonTotal*100):0;   // % of the goal
       playedStore.set(playedStore.get()+1);
       scoreSumStore.set(scoreSumStore.get()+points);
       pctSumStore.set(pctSumStore.get()+pct);
@@ -180,19 +204,19 @@
         const base = BASES[(Math.random()*BASES.length)|0];
         const L = [...new Set(base)];
         const c = L[(Math.random()*L.length)|0];
-        const setL = new Set(L);
-        const v=[], pan=[]; let tp=0, ct=0;
-        for(const w of POOL){
-          if(!w.includes(c)) continue;
-          let ok=true;
-          for(let i=0;i<w.length;i++){ if(!setL.has(w[i])){ ok=false; break; } }
-          if(!ok) continue;
-          const p=pointsFor(w); v.push(w); tp+=p;
-          if((TIER[w]||0)<=COMMON_TIER) ct+=p;
+        let hive=0; for(const ch of L) hive|=1<<(ch.charCodeAt(0)-97);
+        const cb=1<<(c.charCodeAt(0)-97);
+        const v=[], pan=[]; let tp=0, ct=0, goalN=0;
+        for(let i=0;i<POOL.length;i++){
+          const m=PMASK[i];
+          if((m & ~hive)!==0 || (m & cb)===0) continue;   // only hive letters, must include center
+          const w=POOL[i]; const p=pointsFor(w);
+          v.push(w); tp+=p;
+          if((TIER[w]||0)<=COMMON_TIER){ ct+=p; goalN++; }
           if(new Set(w).size===7) pan.push(w);
         }
-        if(v.length>=15 && v.length<=60 && pan.length>=1){
-          return { L, c, valid:new Set(v), pangrams:new Set(pan), totalPts:tp, commonTotal:ct };
+        if(goalN>=15 && pan.length>=1){
+          return { L, c, valid:new Set(v), pangrams:new Set(pan), totalPts:tp, commonTotal:ct, goalCount:goalN };
         }
       }
       return null;
@@ -201,8 +225,8 @@
     function startRound(){
       let p=null, guard=0;
       while(!p && guard++<5) p=makePuzzle();
-      if(!p){ p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1,commonTotal:1}; }
-      letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts; commonTotal=p.commonTotal;
+      if(!p){ p=makePuzzle()|| {L:['a','e','i','o','u','t','r'],c:'t',valid:new Set(),pangrams:new Set(),totalPts:1,commonTotal:1,goalCount:0}; }
+      letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts; commonTotal=p.commonTotal; goalCount=p.goalCount;
       outer = letters.filter(x=>x!==center);
       found=new Set(); points=0; solvedFired=false; gaveUp=false; cur=''; roundCounted=false;
       const pct = mode==='marathon' ? marathonPct(round) : RELAXED_PCT;
@@ -210,16 +234,22 @@
       $('#overlay').classList.add('hidden');
       $('#keepgoing').style.display='';
       renderHive(); renderEntry(); renderFound(); renderRank(); updateModeUI();
+      if(mode==='marathon') runCountdown();
     }
 
+    function resetTransient(){
+      counting=false; awaitingNext=false;
+      $('#roundClear').style.display='none'; $('#dockMain').style.display='';
+      $('#countdown').style.display='none';
+    }
     function newRelaxed(){
       if(started) recordRound();        // bank the relaxed round we're leaving
-      stopTimer(); mode='relaxed'; started=true; runOver=false;
+      stopTimer(); resetTransient(); mode='relaxed'; started=true; runOver=false;
       startRound();
     }
     function newMarathon(){
       if(started) recordRound();
-      stopTimer(); mode='marathon'; started=true; runOver=false;
+      stopTimer(); resetTransient(); mode='marathon'; started=true; runOver=false;
       round=1; clock=START_TIME;
       startRound(); updateClock(); startTimer();
     }
@@ -229,18 +259,39 @@
     function startTimer(){ stopTimer(); timer=setInterval(tick,100); }
     function stopTimer(){ if(timer){ clearInterval(timer); timer=null; } }
     function tick(){
-      if(runOver) return;
-      if(!$('#howto').classList.contains('hidden')) return;   // pause while help is open
+      if(runOver || counting || awaitingNext) return;          // frozen during countdown / between rounds
+      if(!$('#howto').classList.contains('hidden')) return;     // pause while help is open
       clock -= 0.1;
       if(clock<=0){ clock=0; updateClock(); marathonOver(); return; }
       updateClock();
+    }
+    function runCountdown(){
+      counting=true;
+      const el=$('#countdown'); el.style.display='flex'; let n=3; el.textContent=n;
+      const id=setInterval(()=>{
+        n--;
+        if(n>0) el.textContent=n;
+        else if(n===0) el.textContent='Go!';
+        else { clearInterval(id); el.style.display='none'; counting=false; }
+      }, 650);
     }
     function clearRound(){
       const cleared = round;
       clock += CLEAR_BONUS;
       if(cleared > marBestStore.get()) marBestStore.set(cleared);
+      awaitingNext = true;                                   // freeze clock + input until "Next round"
+      updateClock();
+      $('#rcMsg').textContent = `Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`;
+      $('#rcView').style.display='';
+      $('#dockMain').style.display='none';
+      $('#roundClear').style.display='flex';
+    }
+    function viewRoundWords(){ gaveUp=true; renderFound(); $('#rcView').style.display='none'; }
+    function nextRound(){
+      awaitingNext=false;
+      $('#roundClear').style.display='none';
+      $('#dockMain').style.display='';
       round++;
-      toast(`Round ${cleared} cleared!  +${CLEAR_BONUS}s ⏱`, 1500);
       startRound();
     }
     function marathonOver(){
@@ -303,18 +354,23 @@
         s.textContent=ch; e.appendChild(s);
       }
     }
+    const isGoal = w => (TIER[w]||0) <= COMMON_TIER;
     function renderFound(){
-      $('#foundCount').textContent = found.size+'/'+valid.size+' words';
+      const foundGoal  = [...found].filter(isGoal).length;
+      const foundBonus = found.size - foundGoal;
+      $('#foundCount').textContent = `${foundGoal}/${goalCount} words` + (foundBonus? ` · ${foundBonus} bonus`:'');
       const np=[...found].filter(w=>pangrams.has(w)).length;
       $('#panCount').textContent = np? (np+' pangram'+(np!==1?'s':'')+' 🎉') : '';
       const list=$('#foundList');
       if(gaveUp){
-        // reveal everything: found words normal, missed words in red
+        // show every GOAL word (found/missed) plus any bonus words you found; obscure unfound words stay hidden
+        const goalWords=[...valid].filter(isGoal);
+        const show=[...new Set([...goalWords, ...found])].sort();
         list.innerHTML='';
-        [...valid].sort().forEach(w=>{
-          const got=found.has(w);
+        show.forEach(w=>{
+          const got=found.has(w), bonus=!isGoal(w);
           const s=document.createElement('span');
-          s.className='fw'+(pangrams.has(w)?' pan':'')+(got?'':' missed');
+          s.className='fw'+(pangrams.has(w)?' pan':'')+(got?(bonus?' bonus':''):' missed');
           s.textContent=w; list.appendChild(s);
         });
         return;
@@ -322,7 +378,7 @@
       if(found.size===0){ list.innerHTML='<span class="fw" style="opacity:.4">Found words appear here…</span>'; return; }
       list.innerHTML='';
       [...found].sort().forEach(w=>{
-        const s=document.createElement('span'); s.className='fw'+(pangrams.has(w)?' pan':''); s.textContent=w; list.appendChild(s);
+        const s=document.createElement('span'); s.className='fw'+(pangrams.has(w)?' pan':'')+(isGoal(w)?'':' bonus'); s.textContent=w; list.appendChild(s);
       });
     }
     function giveUp(){
@@ -332,22 +388,24 @@
     }
     function rankFor(pct){ let name=RANKS[0][1]; for(const [t,n] of RANKS){ if(pct>=t) name=n; } return name; }
     function renderRank(){
-      const pct = totalPts? points/totalPts*100 : 0;
+      const base = commonTotal||1;                 // measure progress against the goal points
+      const pct = points/base*100;
       $('#pts').textContent = points;
       $('#rankName').textContent = rankFor(pct);
       $('#rankBar').style.width = Math.min(100, pct) + '%';
-      $('#winMark').style.left = Math.min(100, totalPts? targetPts/totalPts*100 : 50) + '%';
+      $('#winMark').style.left = Math.min(100, targetPts/base*100) + '%';
       $('#goalNote').textContent = points>=targetPts
         ? (mode==='marathon' ? 'Goal reached!' : `Cleared! ${points} pts — keep climbing for a higher rank`)
         : `${targetPts-points} pts to clear  (${points}/${targetPts})`;
     }
 
-    function addLetter(ch){ if(gaveUp||runOver) return; cur+=ch; renderEntry(); }
-    function del(){ if(gaveUp||runOver) return; cur=cur.slice(0,-1); renderEntry(); }
+    function blocked(){ return gaveUp||runOver||counting||awaitingNext; }
+    function addLetter(ch){ if(blocked()) return; cur+=ch; renderEntry(); }
+    function del(){ if(blocked()) return; cur=cur.slice(0,-1); renderEntry(); }
     function shuffle(){ for(let i=outer.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [outer[i],outer[j]]=[outer[j],outer[i]]; } renderHive(); }
 
     function enter(){
-      if(gaveUp||runOver) return;
+      if(blocked()) return;
       const w=cur.toLowerCase();
       if(w.length<4){ toast('Too short — 4+ letters'); flash(); cur=''; renderEntry(); return; }
       if(!w.includes(center)){ toast('Missing center letter'); flash(); return; }
@@ -367,7 +425,7 @@
       }
     }
     function saveBest(){
-      const pct = totalPts? Math.round(points/totalPts*100):0;
+      const pct = commonTotal? Math.round(points/commonTotal*100):0;   // % of the goal (can exceed 100 with bonus)
       if(points>hiscoreStore.get()) hiscoreStore.set(points);
       if(pct>hipctStore.get()) hipctStore.set(pct);
     }
@@ -391,6 +449,8 @@
     $('#keepgoing').addEventListener('click', ()=>$('#overlay').classList.add('hidden'));
     $('#modeRelaxed').addEventListener('click', ()=>{ if(mode!=='relaxed') newRelaxed(); });
     $('#modeMarathon').addEventListener('click', ()=>{ if(mode!=='marathon') newMarathon(); });
+    $('#rcView').addEventListener('click', viewRoundWords);
+    $('#rcNext').addEventListener('click', nextRound);
     $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
     $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
     window.addEventListener('keydown', e=>{
