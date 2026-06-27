@@ -141,6 +141,7 @@
         <div class="s"><b id="mPan">0</b><span>Pangrams</span></div></div>
       <div class="row">
         <button class="ghost" id="keepgoing">Keep going</button>
+        <button class="ghost" id="viewAll" style="display:none">View words</button>
         <button class="btn" id="again">New hive</button>
       </div>
       <a class="home" style="position:static" href="index.html">← Back to games</a>
@@ -158,9 +159,9 @@
     // tuning
     const COMMON_TIER = 7;               // tier <= this (rank <= ~40k) = a 'goal' word; 8-9 = bonus only
     const RELAXED_PCT = 60;              // relaxed: clear at this % of the goal-word points
-    const MAR_START=35, MAR_STEP=8, MAR_CAP=90;   // marathon target ramp
-    const START_TIME=60, CLEAR_BONUS=30;          // marathon clock (seconds)
-    const marathonPct = r => Math.min(MAR_CAP, MAR_START + MAR_STEP*(r-1));
+    const MAR_BASE=45, MAR_RAMP=35, MAR_CAPPCT=85; // marathon target: absolute pts ramp, capped at % of goal
+    const START_TIME=70, CLEAR_BONUS=30;           // marathon clock (seconds)
+    const marTarget = (r, common) => Math.min(MAR_BASE + MAR_RAMP*(r-1), Math.ceil(common*MAR_CAPPCT/100));
 
     // accept every word; bonus words (tier > COMMON_TIER) earn points but don't count toward the goal
     const POOL  = WORDS;
@@ -229,8 +230,9 @@
       letters=p.L; center=p.c; valid=p.valid; pangrams=p.pangrams; totalPts=p.totalPts; commonTotal=p.commonTotal; goalCount=p.goalCount;
       outer = letters.filter(x=>x!==center);
       found=new Set(); points=0; solvedFired=false; gaveUp=false; cur=''; roundCounted=false;
-      const pct = mode==='marathon' ? marathonPct(round) : RELAXED_PCT;
-      targetPts = Math.max(1, Math.ceil(commonTotal * pct/100));
+      targetPts = mode==='marathon'
+        ? marTarget(round, commonTotal)
+        : Math.max(1, Math.ceil(commonTotal * RELAXED_PCT/100));
       $('#overlay').classList.add('hidden');
       $('#keepgoing').style.display='';
       renderHive(); renderEntry(); renderFound(); renderRank(); updateModeUI();
@@ -306,6 +308,7 @@
       $('#mPts').textContent = points;      $('#mPts').nextElementSibling.textContent='Last pts';
       $('#mPan').textContent = marBestStore.get(); $('#mPan').nextElementSibling.textContent='Best';
       $('#keepgoing').style.display='none';
+      $('#viewAll').style.display='';
       $('#overlay').classList.remove('hidden');
     }
 
@@ -318,7 +321,7 @@
       $('#newgame').textContent = mode==='marathon' ? 'New run' : 'New hive';
       $('#again').textContent   = mode==='marathon' ? 'New run' : 'New hive';
       $('#giveup').textContent  = mode==='marathon' ? 'End run' : 'Give up';
-      if(mode==='marathon') $('#mRound').textContent = `Round ${round} · target ${marathonPct(round)}%`;
+      if(mode==='marathon') $('#mRound').textContent = `Round ${round} · goal ${targetPts} pts`;
     }
 
     let cur='';
@@ -431,6 +434,7 @@
     }
     function celebrate(){
       $('#result').textContent='Solved! 🎉'; $('#result').className='win';
+      $('#viewAll').style.display='none';
       $('#modalStats').style.display='flex';
       $('#mWords').textContent=found.size; $('#mWords').nextElementSibling.textContent='Words';
       $('#mPts').textContent=points; $('#mPts').nextElementSibling.textContent='Points';
@@ -451,6 +455,7 @@
     $('#modeMarathon').addEventListener('click', ()=>{ if(mode!=='marathon') newMarathon(); });
     $('#rcView').addEventListener('click', viewRoundWords);
     $('#rcNext').addEventListener('click', nextRound);
+    $('#viewAll').addEventListener('click', ()=>{ gaveUp=true; renderFound(); $('#overlay').classList.add('hidden'); });
     $('#howtoBtn').addEventListener('click', ()=>$('#howto').classList.remove('hidden'));
     $('#howtoClose').addEventListener('click', ()=>$('#howto').classList.add('hidden'));
     window.addEventListener('keydown', e=>{
